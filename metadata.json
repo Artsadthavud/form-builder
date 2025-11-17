@@ -1,0 +1,5 @@
+{
+  "name": "Form Builder",
+  "description": "A responsive and dynamic form builder application. Design complex forms with various input types, customize properties, set up conditional dependencies, and preview the final result. You can also use AI to generate a form from a text description.",
+  "requestFramePermissions": []
+}
