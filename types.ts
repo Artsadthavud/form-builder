@@ -1,87 +1,77 @@
 
-export enum FormFieldType {
-  TEXT = 'text',
-  TEXTAREA = 'textarea',
-  EMAIL = 'email',
-  PASSWORD = 'password',
-  NUMBER = 'number',
-  CHECKBOX = 'checkbox',
-  RADIO = 'radio',
-  SELECT = 'select',
-  HEADING = 'heading',
-  PARAGRAPH = 'paragraph',
-}
+export type ElementType = 'text' | 'number' | 'textarea' | 'radio' | 'checkbox' | 'select' | 'section' | 'signature' | 'image' | 'date' | 'time' | 'file' | 'rating' | 'paragraph';
 
-export type ViewMode = 'design' | 'preview';
-
-export type WidthOption = 'w-full' | 'w-1/2' | 'w-1/3' | 'w-2/3';
-
-export interface FormElementOption {
+export interface Option {
   id: string;
   label: string;
   value: string;
 }
 
-export type ConditionAction = 'show' | 'hide' | 'enable' | 'disable';
-export type ConditionOperator = 'equals' | 'not_equals' | 'contains';
+export type ConditionOperator = 'equals' | 'not_equals' | 'contains' | 'not_contains';
 
 export interface Condition {
   id: string;
   targetId: string;
   operator: ConditionOperator;
   value: string;
-  action: ConditionAction;
 }
 
-interface BaseFormElement {
-  id: string;
-  type: FormFieldType;
-  label: string;
-  width: WidthOption;
+export interface Logic {
+  combinator: 'AND' | 'OR';
   conditions: Condition[];
 }
 
-export interface InputElement extends BaseFormElement {
-  type: FormFieldType.TEXT | FormFieldType.EMAIL | FormFieldType.PASSWORD | FormFieldType.NUMBER;
-  placeholder: string;
+export interface FormMetadata {
+  title: string;
+  description?: string;
+  logoUrl?: string;
+  footerText?: string;
+  // Styling
+  headerBackgroundColor?: string;
+  headerTitleColor?: string; // Title & Description color
+  logoPlacement?: 'top' | 'bottom' | 'left' | 'right';
+  logoAlignment?: 'left' | 'center' | 'right';
+  headerTextAlignment?: 'left' | 'center' | 'right';
+  logoWidth?: number; // Percentage width (5-100)
+  footerBackgroundColor?: string;
+  footerTextColor?: string;
+}
+
+export interface FormElement {
+  id: string;
+  type: ElementType;
+  label: string;
+  placeholder?: string;
   required: boolean;
+  options?: Option[]; // For radio, checkbox, select
+  logic?: Logic;      // Complex dependency logic
+  parentId?: string;  // For nesting inside sections
+  orientation?: 'vertical' | 'horizontal'; // For radio and checkbox groups
+  
+  // Layout
+  width?: string; // '100', '50', '33', '67', '25' representing percentage
+  
+  // Image specific properties
+  imageUrl?: string;
+  imageAlt?: string;
+  imageWidth?: number; // percentage 10-100
+  imageAlign?: 'left' | 'center' | 'right';
+
+  // Signature specific properties
+  signatureHeight?: number;
+
+  // Paragraph / Rich Text specific
+  content?: string;
+
+  // Rating specific
+  ratingMax?: number;
+
+  // Validation properties
+  min?: number;       // For number inputs
+  max?: number;       // For number inputs
+  minLength?: number; // For text/textarea
+  maxLength?: number; // For text/textarea
+  pattern?: string;   // Regex pattern
+  validationType?: 'text' | 'email'; // specific format validation
+  customErrorMsg?: string; // Custom validation message
 }
-
-export interface TextAreaElement extends BaseFormElement {
-  type: FormFieldType.TEXTAREA;
-  placeholder: string;
-  required: boolean;
-  rows: number;
-}
-
-export interface CheckboxElement extends BaseFormElement {
-  type: FormFieldType.CHECKBOX;
-  required: boolean;
-}
-
-export interface RadioElement extends BaseFormElement {
-  type: FormFieldType.RADIO;
-  options: FormElementOption[];
-  required: boolean;
-}
-
-export interface SelectElement extends BaseFormElement {
-  type: FormFieldType.SELECT;
-  options: FormElementOption[];
-  required: boolean;
-}
-
-export interface HeadingElement extends BaseFormElement {
-    type: FormFieldType.HEADING;
-    text: string;
-    level: 'h1' | 'h2' | 'h3' | 'h4';
-}
-
-export interface ParagraphElement extends BaseFormElement {
-    type: FormFieldType.PARAGRAPH;
-    text: string;
-}
-
-export type FormElement = InputElement | TextAreaElement | CheckboxElement | RadioElement | SelectElement | HeadingElement | ParagraphElement;
-
-export type FormValues = Record<string, any>;

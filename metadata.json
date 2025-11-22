@@ -1,5 +1,5 @@
 {
-  "name": "Form Builder",
-  "description": "A responsive and dynamic form builder application. Design complex forms with various input types, customize properties, set up conditional dependencies, and preview the final result. You can also use AI to generate a form from a text description.",
+  "name": "FormFlow Builder",
+  "description": "A powerful drag-and-drop form builder with dependency logic, element grouping, and live preview.",
   "requestFramePermissions": []
 }
