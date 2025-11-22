@@ -41,6 +41,7 @@ export interface FormElement {
   id: string;
   type: ElementType;
   label: string;
+  pageId?: string;
   placeholder?: string;
   required: boolean;
   options?: Option[]; // For radio, checkbox, select

@@ -9,6 +9,7 @@ interface PropertiesPanelProps {
   onUpdate: (element: FormElement) => void;
   onDelete: (id: string) => void;
   onUpdateMetadata: (meta: FormMetadata) => void;
+  onRequestLabelChange: (id: string, newLabel: string) => void;
 }
 
 const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ 
@@ -17,7 +18,8 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   formMetadata,
   onUpdate, 
   onDelete, 
-  onUpdateMetadata 
+  onUpdateMetadata,
+  onRequestLabelChange
 }) => {
   const [draggedOptionIdx, setDraggedOptionIdx] = useState<number | null>(null);
 
@@ -381,7 +383,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
               <input
                 type="text"
                 value={element.label}
-                onChange={(e) => handleChange('label', e.target.value)}
+                onChange={(e) => onRequestLabelChange(element.id, e.target.value)}
                 className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
               />
             </div>
@@ -499,7 +501,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
         )}
 
         {/* Specifics */}
-        {(element.placeholder !== undefined || element.type === 'radio' || element.type === 'checkbox' || element.type === 'image' || element.type === 'signature' || element.type === 'rating' || element.type === 'paragraph') && (
+        {(element.placeholder !== undefined || element.type === 'radio' || element.type === 'checkbox' || element.type === 'select' || element.type === 'image' || element.type === 'signature' || element.type === 'rating' || element.type === 'paragraph') && (
           <div className="space-y-3 border-t border-slate-100 pt-4">
              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Specifics</h3>
              
@@ -537,12 +539,48 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                 </div>
              )}
 
-             {(element.type === 'radio' || element.type === 'checkbox') && (
+             {(element.type === 'radio' || element.type === 'checkbox' || element.type === 'select') && (
                 <div>
                   <label className="block text-xs font-medium text-slate-700 mb-1">Alignment</label>
                   <div className="flex bg-slate-100 p-1 rounded-md border border-slate-200">
                     <button className={`flex-1 py-1 text-xs rounded font-medium transition-all ${(!element.orientation || element.orientation === 'vertical') ? 'bg-white shadow text-indigo-600' : 'text-slate-500'}`} onClick={() => handleChange('orientation', 'vertical')}>Vertical</button>
                     <button className={`flex-1 py-1 text-xs rounded font-medium transition-all ${element.orientation === 'horizontal' ? 'bg-white shadow text-indigo-600' : 'text-slate-500'}`} onClick={() => handleChange('orientation', 'horizontal')}>Horizontal</button>
+                  </div>
+
+                  {/* Options Editor */}
+                  <div className="mt-3">
+                    <label className="block text-xs font-medium text-slate-700 mb-2">Options</label>
+                    <div className="space-y-2">
+                      {(element.options || []).map((opt, idx) => (
+                        <div
+                          key={opt.id}
+                          draggable
+                          onDragStart={(e) => handleOptionDragStart(e, idx)}
+                          onDragOver={(e) => handleOptionDragOver(e, idx)}
+                          onDragEnd={handleOptionDragEnd}
+                          className="flex items-center gap-2"
+                        >
+                          <div className="w-6 text-slate-400 text-center">≡</div>
+                          <input
+                            type="text"
+                            value={opt.label}
+                            onChange={(e) => handleOptionChange(idx, 'label', e.target.value)}
+                            className="flex-1 px-2 py-1 border border-slate-300 rounded text-sm bg-white"
+                          />
+                          <input
+                            type="text"
+                            value={opt.value}
+                            onChange={(e) => handleOptionChange(idx, 'value', e.target.value)}
+                            className="w-36 px-2 py-1 border border-slate-300 rounded text-sm bg-white"
+                          />
+                          <button onClick={() => removeOption(idx)} className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded">Remove</button>
+                        </div>
+                      ))}
+
+                      <div>
+                        <button onClick={addOption} className="px-3 py-1.5 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded text-sm">+ Add Option</button>
+                      </div>
+                    </div>
                   </div>
                 </div>
              )}
@@ -590,6 +628,57 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                    </div>
                 </div>
              )}
+
+          {/* Conditional Logic Section */}
+          <div className="space-y-3 border-t border-slate-100 pt-4">
+            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Conditional Logic</h3>
+            {!element.logic && (
+              <div>
+                <p className="text-sm text-slate-600 mb-2">No logic rules. Use logic to show/hide this field based on other fields.</p>
+                <button onClick={initLogic} className="px-3 py-1.5 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded text-sm">Enable Logic</button>
+              </div>
+            )}
+
+            {element.logic && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="text-xs text-slate-500">Combinator</div>
+                  <div className="flex bg-slate-100 p-1 rounded-md border border-slate-200">
+                    <button className={`px-2 text-xs rounded ${element.logic.combinator === 'AND' ? 'bg-white shadow text-indigo-600' : 'text-slate-500'}`} onClick={() => handleChange('logic', { ...element.logic!, combinator: 'AND' })}>AND</button>
+                    <button className={`px-2 text-xs rounded ${element.logic.combinator === 'OR' ? 'bg-white shadow text-indigo-600' : 'text-slate-500'}`} onClick={() => handleChange('logic', { ...element.logic!, combinator: 'OR' })}>OR</button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  {(element.logic.conditions || []).map((cond, idx) => (
+                    <div key={cond.id} className="flex items-center gap-2">
+                      <select value={cond.targetId} onChange={(e) => updateCondition(idx, 'targetId', e.target.value)} className="px-2 py-1 border border-slate-300 rounded text-sm bg-white">
+                        <option value="">-- Select Field --</option>
+                        {potentialLogicTargets.map(t => (
+                          <option key={t.id} value={t.id}>{t.label}</option>
+                        ))}
+                      </select>
+
+                      <select value={cond.operator} onChange={(e) => updateCondition(idx, 'operator', e.target.value)} className="px-2 py-1 border border-slate-300 rounded text-sm bg-white">
+                        <option value="equals">equals</option>
+                        <option value="not_equals">not equals</option>
+                        <option value="contains">contains</option>
+                        <option value="not_contains">not contains</option>
+                      </select>
+
+                      <input type="text" value={cond.value} onChange={(e) => updateCondition(idx, 'value', e.target.value)} placeholder="Value" className="px-2 py-1 border border-slate-300 rounded text-sm bg-white" />
+
+                      <button onClick={() => removeCondition(idx)} className="text-xs text-red-600 px-2 py-1 rounded hover:bg-red-50">Remove</button>
+                    </div>
+                  ))}
+                </div>
+
+                <div>
+                  <button onClick={addCondition} className="px-3 py-1.5 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded text-sm">+ Add Condition</button>
+                </div>
+              </div>
+            )}
+          </div>
           </div>
         )}
       </div>

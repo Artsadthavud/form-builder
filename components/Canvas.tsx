@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { FormElement, FormMetadata } from '../types';
+import { FormElement, FormMetadata, ElementType } from '../types';
 
 interface CanvasProps {
   elements: FormElement[];
@@ -11,9 +11,10 @@ interface CanvasProps {
   onDelete: (id: string) => void;
   onReparent: (elementId: string, newParentId?: string) => void;
   onUpdateMeta: (meta: FormMetadata) => void;
+  onAdd: (type: ElementType, opts?: { parentId?: string; insertAfterId?: string; insertIndex?: number }) => void;
 }
 
-const Canvas: React.FC<CanvasProps> = ({ elements, meta, selectedId, onSelect, onMove, onDelete, onReparent, onUpdateMeta }) => {
+const Canvas: React.FC<CanvasProps> = ({ elements, meta, selectedId, onSelect, onMove, onDelete, onReparent, onUpdateMeta, onAdd }) => {
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [isDragOverHeader, setIsDragOverHeader] = useState(false);
 
@@ -45,6 +46,14 @@ const Canvas: React.FC<CanvasProps> = ({ elements, meta, selectedId, onSelect, o
   const handleDropOnSection = (e: React.DragEvent, sectionId: string) => {
     e.preventDefault();
     e.stopPropagation();
+    // Check for new element dropped from toolbox
+    const newType = e.dataTransfer.getData('application/x-formflow-new');
+    if (newType) {
+      onAdd(newType as ElementType, { parentId: sectionId });
+      setDraggedId(null);
+      return;
+    }
+
     if (draggedId && draggedId !== sectionId) {
       onReparent(draggedId, sectionId);
       setDraggedId(null);
@@ -53,6 +62,13 @@ const Canvas: React.FC<CanvasProps> = ({ elements, meta, selectedId, onSelect, o
 
   const handleDropOnRoot = (e: React.DragEvent) => {
     e.preventDefault();
+    const newType = e.dataTransfer.getData('application/x-formflow-new');
+    if (newType) {
+      onAdd(newType as ElementType, {});
+      setDraggedId(null);
+      return;
+    }
+
     if (draggedId) {
       onReparent(draggedId, undefined);
       setDraggedId(null);
