@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
-import { FormElement, Option, Condition, Logic, FormMetadata } from '../types';
+import { FormElement, Option, Condition, Logic, FormMetadata, Language, TranslatableText } from '../types';
+import { getText, isTranslatable, makeTranslatable } from '../utils/i18n';
 
 interface PropertiesPanelProps {
   element?: FormElement;
@@ -22,9 +23,35 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   onRequestLabelChange
 }) => {
   const [draggedOptionIdx, setDraggedOptionIdx] = useState<number | null>(null);
+  const [editLanguage, setEditLanguage] = useState<Language>(formMetadata.defaultLanguage || 'th');
 
   const handleMetaChange = (field: keyof FormMetadata, value: any) => {
     onUpdateMetadata({ ...formMetadata, [field]: value });
+  };
+
+  // Helper to update translatable fields
+  const updateTranslatableMetaField = (field: keyof FormMetadata, lang: Language, value: string) => {
+    const current = formMetadata[field];
+    if (isTranslatable(current)) {
+      handleMetaChange(field, { ...current, [lang]: value });
+    } else {
+      // Convert to translatable
+      const translatable: TranslatableText = { th: '', en: '' };
+      translatable[lang] = value;
+      handleMetaChange(field, translatable);
+    }
+  };
+
+  const updateTranslatableElementField = (field: 'label' | 'placeholder' | 'content', lang: Language, value: string) => {
+    if (!element) return;
+    const current = element[field];
+    if (isTranslatable(current)) {
+      onUpdate({ ...element, [field]: { ...current, [lang]: value } });
+    } else {
+      const translatable: TranslatableText = { th: '', en: '' };
+      translatable[lang] = value;
+      onUpdate({ ...element, [field]: translatable });
+    }
   };
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -50,24 +77,48 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
         </div>
         <div className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar">
           
+          {/* Language Selector */}
+          <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3 space-y-2">
+            <label className="block text-xs font-semibold text-indigo-700 uppercase tracking-wider">Editing Language</label>
+            <div className="flex gap-2">
+              {(formMetadata.availableLanguages || ['th', 'en']).map(lang => (
+                <button
+                  key={lang}
+                  onClick={() => setEditLanguage(lang)}
+                  className={`flex-1 py-2 px-3 text-sm font-medium rounded-md transition-all ${
+                    editLanguage === lang 
+                      ? 'bg-indigo-600 text-white shadow' 
+                      : 'bg-white text-slate-700 hover:bg-indigo-100'
+                  }`}
+                >
+                  {lang === 'th' ? '🇹🇭 ไทย' : '🇬🇧 EN'}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* General Header Settings */}
           <div className="space-y-3">
              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Header Content</h3>
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">Form Title</label>
+              <label className="block text-xs font-medium text-slate-700 mb-1">
+                Form Title ({editLanguage === 'th' ? 'ไทย' : 'English'})
+              </label>
               <input
                 type="text"
-                value={formMetadata.title}
-                onChange={(e) => handleMetaChange('title', e.target.value)}
+                value={getText(formMetadata.title, editLanguage)}
+                onChange={(e) => updateTranslatableMetaField('title', editLanguage, e.target.value)}
                 className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">Description</label>
+              <label className="block text-xs font-medium text-slate-700 mb-1">
+                Description ({editLanguage === 'th' ? 'ไทย' : 'English'})
+              </label>
               <textarea
                 rows={3}
-                value={formMetadata.description || ''}
-                onChange={(e) => handleMetaChange('description', e.target.value)}
+                value={getText(formMetadata.description, editLanguage)}
+                onChange={(e) => updateTranslatableMetaField('description', editLanguage, e.target.value)}
                 className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
               />
             </div>
@@ -220,11 +271,13 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
           <div className="space-y-3 border-t border-slate-100 pt-4">
              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Footer Content & Style</h3>
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">Footer Text</label>
+              <label className="block text-xs font-medium text-slate-700 mb-1">
+                Footer Text ({editLanguage === 'th' ? 'ไทย' : 'English'})
+              </label>
               <input
                 type="text"
-                value={formMetadata.footerText || ''}
-                onChange={(e) => handleMetaChange('footerText', e.target.value)}
+                value={getText(formMetadata.footerText, editLanguage)}
+                onChange={(e) => updateTranslatableMetaField('footerText', editLanguage, e.target.value)}
                 className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
               />
             </div>
@@ -284,7 +337,11 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 
   const addOption = () => {
     const newOptId = `opt_${Date.now()}`;
-    const newOptions = [...(element.options || []), { id: newOptId, label: 'New Option', value: 'new_value' }];
+    const newOptions = [...(element.options || []), { 
+      id: newOptId, 
+      label: { th: 'ตัวเลือกใหม่', en: 'New Option' }, 
+      value: 'new_value' 
+    }];
     handleChange('options', newOptions);
   };
 
@@ -373,17 +430,39 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar">
+        {/* Language Selector */}
+        <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3 space-y-2">
+          <label className="block text-xs font-semibold text-indigo-700 uppercase tracking-wider">Editing Language</label>
+          <div className="flex gap-2">
+            {(formMetadata.availableLanguages || ['th', 'en']).map(lang => (
+              <button
+                key={lang}
+                onClick={() => setEditLanguage(lang)}
+                className={`flex-1 py-2 px-3 text-sm font-medium rounded-md transition-all ${
+                  editLanguage === lang 
+                    ? 'bg-indigo-600 text-white shadow' 
+                    : 'bg-white text-slate-700 hover:bg-indigo-100'
+                }`}
+              >
+                {lang === 'th' ? '🇹🇭 ไทย' : '🇬🇧 EN'}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* General Settings */}
         <div className="space-y-3">
           <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">General</h3>
           
           {element.type !== 'paragraph' && element.type !== 'image' && (
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">Label</label>
+              <label className="block text-xs font-medium text-slate-700 mb-1">
+                Label ({editLanguage === 'th' ? 'ไทย' : 'English'})
+              </label>
               <input
                 type="text"
-                value={element.label}
-                onChange={(e) => onRequestLabelChange(element.id, e.target.value)}
+                value={getText(element.label, editLanguage)}
+                onChange={(e) => updateTranslatableElementField('label', editLanguage, e.target.value)}
                 className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
               />
             </div>
@@ -413,7 +492,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
               >
                 <option value="">(Root)</option>
                 {allElements.filter(e => e.type === 'section' && e.id !== element.id).map(sec => (
-                    <option key={sec.id} value={sec.id}>{sec.label}</option>
+                    <option key={sec.id} value={sec.id}>{getText(sec.label, editLanguage)}</option>
                 ))}
               </select>
             </div>
@@ -500,31 +579,46 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
           </div>
         )}
 
+        {/* Field-Specific Settings */}
+        {element.placeholder !== undefined && (
+          <div className="space-y-3 border-t border-slate-100 pt-4">
+            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Placeholder</h3>
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">
+                Placeholder ({editLanguage === 'th' ? 'ไทย' : 'English'})
+              </label>
+              <input
+                type="text"
+                value={getText(element.placeholder, editLanguage)}
+                onChange={(e) => updateTranslatableElementField('placeholder', editLanguage, e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+              />
+            </div>
+          </div>
+        )}
+
+        {element.type === 'paragraph' && (
+          <div className="space-y-3 border-t border-slate-100 pt-4">
+            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Content</h3>
+            <div>
+              <label className="block text-xs font-medium text-slate-700 mb-1">
+                Content ({editLanguage === 'th' ? 'ไทย' : 'English'})
+              </label>
+              <textarea
+                rows={5}
+                value={getText(element.content, editLanguage)}
+                onChange={(e) => updateTranslatableElementField('content', editLanguage, e.target.value)}
+                className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white font-mono"
+              />
+            </div>
+          </div>
+        )}
+
         {/* Specifics */}
-        {(element.placeholder !== undefined || element.type === 'radio' || element.type === 'checkbox' || element.type === 'select' || element.type === 'image' || element.type === 'signature' || element.type === 'rating' || element.type === 'paragraph') && (
+        {(element.type === 'radio' || element.type === 'checkbox' || element.type === 'select' || element.type === 'image' || element.type === 'signature' || element.type === 'rating') && (
           <div className="space-y-3 border-t border-slate-100 pt-4">
              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Specifics</h3>
              
-             {element.placeholder !== undefined && (
-               <div>
-                 <label className="block text-xs font-medium text-slate-700 mb-1">Placeholder</label>
-                 <input type="text" value={element.placeholder || ''} onChange={(e) => handleChange('placeholder', e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white" />
-               </div>
-             )}
-
-             {element.type === 'paragraph' && (
-               <div>
-                 <label className="block text-xs font-medium text-slate-700 mb-1">Content</label>
-                 <textarea
-                   rows={6}
-                   value={element.content || ''}
-                   onChange={(e) => handleChange('content', e.target.value)}
-                   className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm bg-white"
-                   placeholder="Enter text..."
-                 />
-               </div>
-             )}
-
              {element.type === 'rating' && (
                 <div>
                   <label className="block text-xs font-medium text-slate-700 mb-1">Max Stars</label>
@@ -558,22 +652,38 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                           onDragStart={(e) => handleOptionDragStart(e, idx)}
                           onDragOver={(e) => handleOptionDragOver(e, idx)}
                           onDragEnd={handleOptionDragEnd}
-                          className="flex items-center gap-2"
+                          className="space-y-1"
                         >
-                          <div className="w-6 text-slate-400 text-center">≡</div>
-                          <input
-                            type="text"
-                            value={opt.label}
-                            onChange={(e) => handleOptionChange(idx, 'label', e.target.value)}
-                            className="flex-1 px-2 py-1 border border-slate-300 rounded text-sm bg-white"
-                          />
-                          <input
-                            type="text"
-                            value={opt.value}
-                            onChange={(e) => handleOptionChange(idx, 'value', e.target.value)}
-                            className="w-36 px-2 py-1 border border-slate-300 rounded text-sm bg-white"
-                          />
-                          <button onClick={() => removeOption(idx)} className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded">Remove</button>
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 text-slate-400 text-center text-xs">≡</div>
+                            <input
+                              type="text"
+                              placeholder={`Label (${editLanguage === 'th' ? 'ไทย' : 'EN'})`}
+                              value={getText(opt.label, editLanguage)}
+                              onChange={(e) => {
+                                if (!element.options) return;
+                                const newOptions = [...element.options];
+                                const current = newOptions[idx].label;
+                                if (isTranslatable(current)) {
+                                  newOptions[idx] = { ...newOptions[idx], label: { ...current, [editLanguage]: e.target.value } };
+                                } else {
+                                  const trans: TranslatableText = { th: '', en: '' };
+                                  trans[editLanguage] = e.target.value;
+                                  newOptions[idx] = { ...newOptions[idx], label: trans };
+                                }
+                                handleChange('options', newOptions);
+                              }}
+                              className="flex-1 px-2 py-1 border border-slate-300 rounded text-sm bg-white"
+                            />
+                            <input
+                              type="text"
+                              placeholder="value"
+                              value={opt.value}
+                              onChange={(e) => handleOptionChange(idx, 'value', e.target.value)}
+                              className="w-24 px-2 py-1 border border-slate-300 rounded text-sm bg-white font-mono text-xs"
+                            />
+                            <button onClick={() => removeOption(idx)} className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded">×</button>
+                          </div>
                         </div>
                       ))}
 
@@ -655,7 +765,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                       <select value={cond.targetId} onChange={(e) => updateCondition(idx, 'targetId', e.target.value)} className="px-2 py-1 border border-slate-300 rounded text-sm bg-white">
                         <option value="">-- Select Field --</option>
                         {potentialLogicTargets.map(t => (
-                          <option key={t.id} value={t.id}>{t.label}</option>
+                          <option key={t.id} value={t.id}>{getText(t.label, editLanguage)}</option>
                         ))}
                       </select>
 

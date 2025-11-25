@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { FormElement, Condition, FormMetadata } from '../types';
+import { FormElement, Condition, FormMetadata, Language } from '../types';
+import { getText } from '../utils/i18n';
 
 interface PreviewProps {
   elements: FormElement[];
@@ -224,6 +225,7 @@ const Preview: React.FC<PreviewProps> = ({ elements, meta }) => {
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [visibleIds, setVisibleIds] = useState<Set<string>>(new Set());
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [currentLanguage, setCurrentLanguage] = useState<Language>(meta.defaultLanguage || 'th');
 
   useEffect(() => {
     const newVisible = new Set<string>();
@@ -403,7 +405,7 @@ const Preview: React.FC<PreviewProps> = ({ elements, meta }) => {
     if (el.type === 'paragraph') {
       return (
         <div className="text-slate-700 whitespace-pre-wrap text-sm">
-          {el.content}
+          {getText(el.content, currentLanguage)}
         </div>
       );
     }
@@ -411,13 +413,13 @@ const Preview: React.FC<PreviewProps> = ({ elements, meta }) => {
     return (
       <div className="space-y-1.5">
         <label className="block text-sm font-medium text-slate-700">
-          {el.label} {el.required && <span className="text-red-500">*</span>}
+          {getText(el.label, currentLanguage)} {el.required && <span className="text-red-500">*</span>}
         </label>
         
         {el.type === 'text' && (
           <input 
             type="text"
-            placeholder={el.placeholder}
+            placeholder={getText(el.placeholder, currentLanguage)}
             className={`block w-full bg-white rounded-md shadow-sm focus:ring-indigo-500 sm:text-sm border p-2 ${error ? 'border-red-300 focus:border-red-500' : 'border-slate-300 focus:border-indigo-500'}`}
             value={fieldValue}
             onChange={(e) => handleChange(el.id, e.target.value)}
@@ -428,7 +430,7 @@ const Preview: React.FC<PreviewProps> = ({ elements, meta }) => {
         {el.type === 'number' && (
           <input 
             type="number"
-            placeholder={el.placeholder}
+            placeholder={getText(el.placeholder, currentLanguage)}
             className={`block w-full bg-white rounded-md shadow-sm focus:ring-indigo-500 sm:text-sm border p-2 ${error ? 'border-red-300 focus:border-red-500' : 'border-slate-300 focus:border-indigo-500'}`}
             value={fieldValue}
             onChange={(e) => handleChange(el.id, e.target.value)}
@@ -439,7 +441,7 @@ const Preview: React.FC<PreviewProps> = ({ elements, meta }) => {
 
         {el.type === 'textarea' && (
            <textarea 
-             placeholder={el.placeholder}
+             placeholder={getText(el.placeholder, currentLanguage)}
              rows={3}
              className={`block w-full bg-white rounded-md shadow-sm focus:ring-indigo-500 sm:text-sm border p-2 ${error ? 'border-red-300 focus:border-red-500' : 'border-slate-300 focus:border-indigo-500'}`}
              value={fieldValue}
@@ -495,9 +497,9 @@ const Preview: React.FC<PreviewProps> = ({ elements, meta }) => {
             value={fieldValue}
             onChange={(e) => handleChange(el.id, e.target.value)}
           >
-            <option value="">Select...</option>
+            <option value="">{currentLanguage === 'th' ? 'เลือก...' : 'Select...'}</option>
             {el.options?.map(opt => (
-              <option key={opt.id} value={opt.value}>{opt.label}</option>
+              <option key={opt.id} value={opt.value}>{getText(opt.label, currentLanguage)}</option>
             ))}
           </select>
         )}
@@ -516,7 +518,7 @@ const Preview: React.FC<PreviewProps> = ({ elements, meta }) => {
                   className="h-4 w-4 border-slate-300 text-indigo-600 focus:ring-indigo-500 bg-white"
                 />
                 <label htmlFor={`${el.id}_${opt.id}`} className="ml-2 block text-sm text-slate-700">
-                  {opt.label}
+                  {getText(opt.label, currentLanguage)}
                 </label>
               </div>
             ))}
@@ -536,7 +538,7 @@ const Preview: React.FC<PreviewProps> = ({ elements, meta }) => {
                   className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 bg-white"
                 />
                 <label htmlFor={`${el.id}_${opt.id}`} className="ml-2 block text-sm text-slate-700">
-                  {opt.label}
+                  {getText(opt.label, currentLanguage)}
                 </label>
               </div>
             ))}
@@ -584,7 +586,7 @@ const Preview: React.FC<PreviewProps> = ({ elements, meta }) => {
              <div key={el.id} className="px-2 mb-4 transition-all duration-300 ease-in-out" style={{ width: el.type === 'section' ? '100%' : `${el.width || 100}%` }}>
                {el.type === 'section' ? (
                  <div className="bg-white p-4 md:p-6 rounded-lg border border-slate-200 shadow-sm mb-2">
-                   <h3 className="text-lg font-medium text-slate-900 mb-4 border-b border-slate-100 pb-2">{el.label}</h3>
+                   <h3 className="text-lg font-medium text-slate-900 mb-4 border-b border-slate-100 pb-2">{getText(el.label, currentLanguage)}</h3>
                    {renderRecursive(el.id)}
                  </div>
                ) : (
@@ -599,6 +601,27 @@ const Preview: React.FC<PreviewProps> = ({ elements, meta }) => {
 
   return (
     <div className="w-full max-w-3xl mx-auto">
+      {/* Language Selector */}
+      {meta.availableLanguages && meta.availableLanguages.length > 1 && (
+        <div className="mb-4 flex justify-end">
+          <div className="inline-flex rounded-md shadow-sm bg-white border border-slate-200">
+            {meta.availableLanguages.map(lang => (
+              <button
+                key={lang}
+                onClick={() => setCurrentLanguage(lang)}
+                className={`px-4 py-2 text-sm font-medium transition-colors ${
+                  currentLanguage === lang 
+                    ? 'bg-indigo-600 text-white' 
+                    : 'bg-white text-slate-700 hover:bg-slate-50'
+                } ${lang === meta.availableLanguages[0] ? 'rounded-l-md' : ''} ${lang === meta.availableLanguages[meta.availableLanguages.length - 1] ? 'rounded-r-md' : ''}`}
+              >
+                {lang === 'th' ? 'ไทย' : 'EN'}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      
       {/* Header Block */}
       <div 
         className={`flex gap-6 p-6 md:p-8 rounded-lg border border-slate-200 shadow-sm mb-6 transition-all relative ${meta.logoPlacement === 'top' ? 'flex-col' : meta.logoPlacement === 'bottom' ? 'flex-col-reverse' : meta.logoPlacement === 'left' ? 'flex-row items-center' : 'flex-row-reverse items-center'}`}
@@ -625,15 +648,15 @@ const Preview: React.FC<PreviewProps> = ({ elements, meta }) => {
          )}
          
          <div className={`flex-1 ${meta.headerTextAlignment === 'left' ? 'text-left' : meta.headerTextAlignment === 'right' ? 'text-right' : 'text-center'}`}>
-            <h1 className="text-2xl md:text-3xl font-bold">{meta.title}</h1>
-            {meta.description && <p className="mt-2 opacity-90">{meta.description}</p>}
+            <h1 className="text-2xl md:text-3xl font-bold">{getText(meta.title, currentLanguage)}</h1>
+            {meta.description && <p className="mt-2 opacity-90">{getText(meta.description, currentLanguage)}</p>}
          </div>
       </div>
 
       {elements.some(el => el.required) && (
         <div className="mb-8 bg-white p-4 rounded-lg border border-slate-200 shadow-sm sticky top-0 z-20">
           <div className="flex justify-between text-xs font-medium text-slate-500 mb-1">
-            <span>Form Completion</span>
+            <span>{currentLanguage === 'th' ? 'ความสมบูรณ์ของฟอร์ม' : 'Form Completion'}</span>
             <span>{progressPercentage}%</span>
           </div>
           <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
@@ -644,7 +667,7 @@ const Preview: React.FC<PreviewProps> = ({ elements, meta }) => {
 
       <form onSubmit={(e) => {
         e.preventDefault();
-        alert('Form Submitted! (Check console for data)');
+        alert(currentLanguage === 'th' ? 'ส่งฟอร์มแล้ว! (ตรวจสอบ console สำหรับข้อมูล)' : 'Form Submitted! (Check console for data)');
         console.log(formData);
       }}>
          {renderRecursive(undefined)}
@@ -652,7 +675,7 @@ const Preview: React.FC<PreviewProps> = ({ elements, meta }) => {
          {/* Submit Button */}
          <div className="mt-8 flex justify-end px-2">
            <button type="submit" className="px-6 py-2.5 bg-indigo-600 text-white font-medium text-sm rounded-md shadow-sm hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" disabled={progressPercentage < 100}>
-             Submit Form
+             {currentLanguage === 'th' ? 'ส่งฟอร์ม' : 'Submit Form'}
            </button>
          </div>
       </form>
@@ -665,7 +688,7 @@ const Preview: React.FC<PreviewProps> = ({ elements, meta }) => {
           color: meta.footerTextColor || '#64748b'
         }}
       >
-          {meta.footerText}
+          {getText(meta.footerText, currentLanguage)}
       </div>
     </div>
   );

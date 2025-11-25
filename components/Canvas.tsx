@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { FormElement, FormMetadata, ElementType } from '../types';
+import { getText } from '../utils/i18n';
 
 interface CanvasProps {
   elements: FormElement[];
@@ -185,8 +186,8 @@ const Canvas: React.FC<CanvasProps> = ({ elements, meta, selectedId, onSelect, o
           
           {/* Text Section */}
           <div className={`flex-1 ${headerTextAlignment === 'left' ? 'text-left' : headerTextAlignment === 'right' ? 'text-right' : 'text-center'}`}>
-             <h1 className="text-3xl font-bold">{meta.title}</h1>
-             {meta.description && <p className="mt-2 opacity-80">{meta.description}</p>}
+             <h1 className="text-3xl font-bold">{getText(meta.title, meta.defaultLanguage || 'th')}</h1>
+             {meta.description && <p className="mt-2 opacity-80">{getText(meta.description, meta.defaultLanguage || 'th')}</p>}
           </div>
           
           {!meta.logoUrl && (
@@ -199,11 +200,13 @@ const Canvas: React.FC<CanvasProps> = ({ elements, meta, selectedId, onSelect, o
   };
 
   const renderReadOnlyInput = (el: FormElement) => {
+    const lang = meta.defaultLanguage || 'th';
+    
     switch (el.type) {
       case 'paragraph':
         return (
           <div className="text-slate-600 text-sm whitespace-pre-wrap p-1">
-            {el.content || 'Paragraph text...'}
+            {getText(el.content, lang) || (lang === 'th' ? 'ข้อความย่อหน้า...' : 'Paragraph text...')}
           </div>
         );
       case 'text':
@@ -212,14 +215,14 @@ const Canvas: React.FC<CanvasProps> = ({ elements, meta, selectedId, onSelect, o
       case 'time':
         return (
           <div className="h-9 w-full border border-slate-300 rounded bg-slate-50 px-3 flex items-center text-slate-400 text-sm">
-            {el.placeholder || (el.type === 'date' ? 'YYYY-MM-DD' : el.type === 'time' ? '--:--' : 'Input placeholder...')}
+            {getText(el.placeholder, lang) || (el.type === 'date' ? 'YYYY-MM-DD' : el.type === 'time' ? '--:--' : (lang === 'th' ? 'ใส่ข้อมูล...' : 'Input placeholder...'))}
           </div>
         );
       case 'file':
         return (
           <div className="h-9 w-full border border-slate-300 rounded bg-slate-50 px-3 flex items-center text-slate-400 text-sm gap-2">
-            <span className="bg-slate-200 text-slate-600 px-2 py-0.5 rounded text-xs">Choose File</span>
-            <span>No file selected</span>
+            <span className="bg-slate-200 text-slate-600 px-2 py-0.5 rounded text-xs">{lang === 'th' ? 'เลือกไฟล์' : 'Choose File'}</span>
+            <span>{lang === 'th' ? 'ไม่มีไฟล์ที่เลือก' : 'No file selected'}</span>
           </div>
         );
       case 'rating':
@@ -233,13 +236,13 @@ const Canvas: React.FC<CanvasProps> = ({ elements, meta, selectedId, onSelect, o
       case 'textarea':
         return (
           <div className="h-20 w-full border border-slate-300 rounded bg-slate-50 p-3 text-slate-400 text-sm">
-            {el.placeholder || 'Text area placeholder...'}
+            {getText(el.placeholder, lang) || (lang === 'th' ? 'ใส่ข้อความ...' : 'Text area placeholder...')}
           </div>
         );
       case 'select':
         return (
           <div className="h-9 w-full border border-slate-300 rounded bg-slate-50 px-3 flex items-center justify-between text-slate-600 text-sm">
-            <span>Select an option</span>
+            <span>{lang === 'th' ? 'เลือกตัวเลือก' : 'Select an option'}</span>
             <span className="text-xs">▼</span>
           </div>
         );
@@ -250,7 +253,7 @@ const Canvas: React.FC<CanvasProps> = ({ elements, meta, selectedId, onSelect, o
             {el.options?.map((opt) => (
               <div key={opt.id} className="flex items-center gap-2">
                 <div className={`w-4 h-4 border border-slate-400 ${el.type === 'radio' ? 'rounded-full' : 'rounded'}`}></div>
-                <span className="text-sm text-slate-600">{opt.label}</span>
+                <span className="text-sm text-slate-600">{getText(opt.label, lang)}</span>
               </div>
             ))}
           </div>
@@ -321,10 +324,26 @@ const Canvas: React.FC<CanvasProps> = ({ elements, meta, selectedId, onSelect, o
                   : 'hover:ring-1 hover:ring-slate-300'}
                 ${el.type === 'section' ? 'bg-white border-2 border-dashed border-slate-300 p-4 pt-8' : 'bg-white border border-slate-200 p-4'}
              `}>
+                {/* Delete Button */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (confirm(`Delete "${getText(el.label, meta.defaultLanguage || 'th')}"?`)) {
+                      onDelete(el.id);
+                    }
+                  }}
+                  className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-auto p-1 bg-red-500 hover:bg-red-600 text-white rounded text-xs font-medium shadow-sm z-20"
+                  title="Delete"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+
                 {el.type !== 'image' && (
                   <div className="flex items-center justify-between mb-2 pointer-events-none">
                     <label className={`block font-medium ${el.type === 'section' ? 'text-indigo-600 font-bold text-sm uppercase tracking-wider' : 'text-sm text-slate-700'}`}>
-                      {el.label} {el.required && <span className="text-red-500">*</span>}
+                      {getText(el.label, meta.defaultLanguage || 'th')} {el.required && <span className="text-red-500">*</span>}
                     </label>
                     <div className="flex items-center gap-2">
                       {el.logic && el.logic.conditions.length > 0 && (
@@ -415,7 +434,7 @@ const Canvas: React.FC<CanvasProps> = ({ elements, meta, selectedId, onSelect, o
                  onSelect('');
               }}
             >
-                {meta.footerText}
+                {getText(meta.footerText, meta.defaultLanguage || 'th')}
             </div>
         </div>
     </div>

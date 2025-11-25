@@ -21,10 +21,10 @@ const App: React.FC = () => {
   
   // State for global form settings (Header/Footer)
   const [formMeta, setFormMeta] = useState<FormMetadata>({
-    title: 'Untitled Form',
-    description: 'Please fill out the form below.',
+    title: { th: 'ฟอร์มไม่มีชื่อ', en: 'Untitled Form' },
+    description: { th: 'กรุณากรอกข้อมูลในฟอร์มด้านล่าง', en: 'Please fill out the form below.' },
     logoUrl: '',
-    footerText: '© 2024 FormFlow Builder',
+    footerText: { th: '© 2024 FormFlow Builder', en: '© 2024 FormFlow Builder' },
     headerBackgroundColor: '#ffffff',
     headerTitleColor: '#1e293b', // slate-800
     logoPlacement: 'top',
@@ -32,7 +32,9 @@ const App: React.FC = () => {
     headerTextAlignment: 'center',
     logoWidth: 25, // Default logo width percentage
     footerBackgroundColor: '#ffffff',
-    footerTextColor: '#64748b' // slate-500
+    footerTextColor: '#64748b', // slate-500
+    defaultLanguage: 'th',
+    availableLanguages: ['th', 'en']
   });
 
   // Undo/Redo history
@@ -133,15 +135,37 @@ const App: React.FC = () => {
   };
 
   const addElement = (type: ElementType, opts?: { parentId?: string; insertAfterId?: string; insertIndex?: number }) => {
+    const defaultLabels = {
+      section: { th: 'ส่วนใหม่', en: 'New Section' },
+      signature: { th: 'ลายเซ็น', en: 'Signature' },
+      image: { th: 'รูปภาพ', en: 'Image' },
+      paragraph: { th: 'ข้อมูล', en: 'Information' },
+      text: { th: 'ข้อความใหม่', en: 'New Text' },
+      number: { th: 'ตัวเลขใหม่', en: 'New Number' },
+      textarea: { th: 'ข้อความยาวใหม่', en: 'New Textarea' },
+      radio: { th: 'ตัวเลือกเดียวใหม่', en: 'New Radio' },
+      checkbox: { th: 'ตัวเลือกหลายรายการใหม่', en: 'New Checkbox' },
+      select: { th: 'เมนูดรอปดาวน์ใหม่', en: 'New Select' },
+      date: { th: 'วันที่ใหม่', en: 'New Date' },
+      time: { th: 'เวลาใหม่', en: 'New Time' },
+      file: { th: 'ไฟล์ใหม่', en: 'New File' },
+      rating: { th: 'คะแนนใหม่', en: 'New Rating' }
+    };
+    
     const newElement: FormElement = {
       id: generateId(type),
       type,
-      label: type === 'section' ? 'New Section' : type === 'signature' ? 'Signature' : type === 'image' ? 'Image' : type === 'paragraph' ? 'Information' : `New ${type.charAt(0).toUpperCase() + type.slice(1)}`,
-      placeholder: ['text', 'textarea', 'number', 'email', 'date', 'time'].includes(type) ? 'Enter value...' : undefined,
+      label: defaultLabels[type] || { th: 'ใหม่', en: 'New' },
+      placeholder: ['text', 'textarea', 'number', 'email', 'date', 'time'].includes(type) 
+        ? { th: 'กรอกค่า...', en: 'Enter value...' } 
+        : undefined,
       required: false,
       width: '100', // Default full width
       options: (type === 'radio' || type === 'checkbox' || type === 'select') 
-        ? [{ id: 'opt_1', label: 'Option 1', value: 'option_1' }, { id: 'opt_2', label: 'Option 2', value: 'option_2' }] 
+        ? [
+            { id: 'opt_1', label: { th: 'ตัวเลือก 1', en: 'Option 1' }, value: 'option_1' }, 
+            { id: 'opt_2', label: { th: 'ตัวเลือก 2', en: 'Option 2' }, value: 'option_2' }
+          ] 
         : undefined,
       // Image defaults
       imageWidth: 100,
@@ -149,7 +173,7 @@ const App: React.FC = () => {
       // Signature default
       signatureHeight: 150,
       // Paragraph default
-      content: type === 'paragraph' ? 'Enter your text content here. You can use this space for instructions, disclaimers, or extra information.' : undefined,
+      content: type === 'paragraph' ? { th: 'กรอกเนื้อหาข้อความที่นี่ คุณสามารถใช้พื้นที่นี้สำหรับคำแนะนำ ข้อจำกัดความรับผิดชอบ หรือข้อมูลเพิ่มเติม', en: 'Enter your text content here. You can use this space for instructions, disclaimers, or extra information.' } : undefined,
       // Rating default
       ratingMax: 5
     };

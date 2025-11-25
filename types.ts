@@ -1,9 +1,16 @@
 
 export type ElementType = 'text' | 'number' | 'textarea' | 'radio' | 'checkbox' | 'select' | 'section' | 'signature' | 'image' | 'date' | 'time' | 'file' | 'rating' | 'paragraph';
 
+export type Language = 'th' | 'en';
+
+export interface TranslatableText {
+  th: string;
+  en: string;
+}
+
 export interface Option {
   id: string;
-  label: string;
+  label: string | TranslatableText;
   value: string;
 }
 
@@ -22,10 +29,10 @@ export interface Logic {
 }
 
 export interface FormMetadata {
-  title: string;
-  description?: string;
+  title: string | TranslatableText;
+  description?: string | TranslatableText;
   logoUrl?: string;
-  footerText?: string;
+  footerText?: string | TranslatableText;
   // Styling
   headerBackgroundColor?: string;
   headerTitleColor?: string; // Title & Description color
@@ -35,14 +42,17 @@ export interface FormMetadata {
   logoWidth?: number; // Percentage width (5-100)
   footerBackgroundColor?: string;
   footerTextColor?: string;
+  // Multi-language
+  defaultLanguage?: Language;
+  availableLanguages?: Language[];
 }
 
 export interface FormElement {
   id: string;
   type: ElementType;
-  label: string;
+  label: string | TranslatableText;
   pageId?: string;
-  placeholder?: string;
+  placeholder?: string | TranslatableText;
   required: boolean;
   options?: Option[]; // For radio, checkbox, select
   logic?: Logic;      // Complex dependency logic
