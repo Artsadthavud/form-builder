@@ -7,6 +7,8 @@ interface PropertiesPanelProps {
   element?: FormElement;
   allElements: FormElement[];
   formMetadata: FormMetadata;
+  currentLanguage: Language;
+  onLanguageChange: (lang: Language) => void;
   onUpdate: (element: FormElement) => void;
   onDelete: (id: string) => void;
   onUpdateMetadata: (meta: FormMetadata) => void;
@@ -17,13 +19,17 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   element, 
   allElements, 
   formMetadata,
+  currentLanguage,
+  onLanguageChange,
   onUpdate, 
   onDelete, 
   onUpdateMetadata,
   onRequestLabelChange
 }) => {
   const [draggedOptionIdx, setDraggedOptionIdx] = useState<number | null>(null);
-  const [editLanguage, setEditLanguage] = useState<Language>(formMetadata.defaultLanguage || 'th');
+  const [showAddLanguageModal, setShowAddLanguageModal] = useState(false);
+  const [newLanguageCode, setNewLanguageCode] = useState('');
+  const [languageError, setLanguageError] = useState('');
 
   const handleMetaChange = (field: keyof FormMetadata, value: any) => {
     onUpdateMetadata({ ...formMetadata, [field]: value });
@@ -48,7 +54,12 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
     if (isTranslatable(current)) {
       onUpdate({ ...element, [field]: { ...current, [lang]: value } });
     } else {
+      // Convert string to translatable object, preserving the old value
       const translatable: TranslatableText = { th: '', en: '' };
+      if (typeof current === 'string' && current) {
+        // Put old string value in the default language
+        translatable[formMetadata.defaultLanguage || 'th'] = current;
+      }
       translatable[lang] = value;
       onUpdate({ ...element, [field]: translatable });
     }
@@ -71,55 +82,205 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
     
     return (
       <div className="w-80 bg-white border-l border-slate-200 flex flex-col h-full shadow-lg z-10">
-        <div className="p-4 border-b border-slate-200 bg-slate-50">
-          <h2 className="font-semibold text-slate-800">Form Settings</h2>
-          <p className="text-xs text-slate-500 mt-1">Header & Footer Configuration</p>
+        <div className="p-5 border-b-2 border-slate-200 bg-gradient-to-br from-slate-50 via-indigo-50 to-purple-50">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="p-1.5 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-lg shadow-md">
+              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </div>
+            <h2 className="font-bold text-lg text-slate-800">Form Settings</h2>
+          </div>
+          <p className="text-xs text-slate-600 ml-9">Header & Footer Configuration</p>
         </div>
         <div className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar">
           
           {/* Language Selector */}
-          <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3 space-y-2">
-            <label className="block text-xs font-semibold text-indigo-700 uppercase tracking-wider">Editing Language</label>
-            <div className="flex gap-2">
+          <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border-2 border-indigo-200 rounded-xl p-4 space-y-2 shadow-sm">
+            <div className="flex items-center gap-2">
+              <svg className="w-4 h-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+              </svg>
+              <label className="block text-xs font-bold text-indigo-700 uppercase tracking-wider">Editing Language</label>
+            </div>
+            <select
+              value={currentLanguage}
+              onChange={(e) => onLanguageChange(e.target.value as Language)}
+              className="w-full px-3 py-2 border-2 border-indigo-300 rounded-lg text-sm font-semibold focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white shadow-sm"
+            >
               {(formMetadata.availableLanguages || ['th', 'en']).map(lang => (
-                <button
-                  key={lang}
-                  onClick={() => setEditLanguage(lang)}
-                  className={`flex-1 py-2 px-3 text-sm font-medium rounded-md transition-all ${
-                    editLanguage === lang 
-                      ? 'bg-indigo-600 text-white shadow' 
-                      : 'bg-white text-slate-700 hover:bg-indigo-100'
-                  }`}
-                >
-                  {lang === 'th' ? '🇹🇭 ไทย' : '🇬🇧 EN'}
-                </button>
+                <option key={lang} value={lang}>
+                  {lang === 'th' ? '🇹🇭 ไทย (Thai)' : lang === 'en' ? '🇬🇧 EN (English)' : `${lang.toUpperCase()}`}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Available Languages Management */}
+          <div className="bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 border-2 border-indigo-200 rounded-xl p-4 space-y-3 shadow-sm">
+            <div className="flex items-center justify-between pb-2 border-b-2 border-indigo-200">
+              <div className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
+                </svg>
+                <h3 className="text-sm font-bold text-indigo-700 uppercase tracking-wide">Available Languages</h3>
+              </div>
+              <span className="px-2 py-1 bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-[10px] font-bold rounded-full shadow-sm">
+                {(formMetadata.availableLanguages || ['th', 'en']).length}
+              </span>
+            </div>
+            <div className="space-y-2">
+              {(formMetadata.availableLanguages || ['th', 'en']).map((lang, idx) => (
+                <div key={lang} className="flex items-center gap-2 bg-white rounded-lg p-2 border-2 border-indigo-200 shadow-sm hover:border-purple-300 transition-all">
+                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 text-white text-xs font-bold shadow-sm">
+                    {idx + 1}
+                  </span>
+                  <span className="flex-1 font-semibold text-sm text-slate-700">
+                    {lang === 'th' ? '🇹🇭 Thai' : lang === 'en' ? '🇬🇧 English' : lang.toUpperCase()}
+                  </span>
+                  {(formMetadata.availableLanguages || ['th', 'en']).length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newLangs = (formMetadata.availableLanguages || ['th', 'en']).filter(l => l !== lang);
+                        handleMetaChange('availableLanguages', newLangs);
+                        if (currentLanguage === lang) onLanguageChange(newLangs[0]);
+                      }}
+                      className="px-2 py-1 text-[10px] font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-md transition-all"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
               ))}
             </div>
+
+            {/* Inline Add Language Form */}
+            {showAddLanguageModal && (
+              <div className="bg-white rounded-lg p-3 border-2 border-indigo-300 shadow-md space-y-2">
+                <label className="block text-xs font-semibold text-slate-700">
+                  New Language Code
+                </label>
+                <input
+                  type="text"
+                  value={newLanguageCode}
+                  onChange={(e) => {
+                    setNewLanguageCode(e.target.value);
+                    setLanguageError('');
+                  }}
+                  placeholder="e.g., zh, ja, ko"
+                  className={`w-full px-3 py-2 border-2 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 transition-all ${
+                    languageError ? 'border-red-500 focus:border-red-500' : 'border-slate-300 focus:border-indigo-500'
+                  }`}
+                  autoFocus
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      const cleanLang = newLanguageCode.trim().toLowerCase();
+                      if (!cleanLang || cleanLang.length < 2) {
+                        setLanguageError('Please enter at least 2 characters');
+                        return;
+                      }
+                      const current = formMetadata.availableLanguages || ['th', 'en'];
+                      if (current.includes(cleanLang)) {
+                        setLanguageError(`"${cleanLang}" already exists!`);
+                        return;
+                      }
+                      handleMetaChange('availableLanguages', [...current, cleanLang]);
+                      setNewLanguageCode('');
+                      setLanguageError('');
+                      setShowAddLanguageModal(false);
+                    }
+                  }}
+                />
+                {languageError && (
+                  <p className="text-xs text-red-600 font-medium">
+                    ⚠️ {languageError}
+                  </p>
+                )}
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewLanguageCode('');
+                      setLanguageError('');
+                      setShowAddLanguageModal(false);
+                    }}
+                    className="flex-1 px-3 py-2 text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg font-medium text-xs transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const cleanLang = newLanguageCode.trim().toLowerCase();
+                      if (!cleanLang || cleanLang.length < 2) {
+                        setLanguageError('Please enter at least 2 characters');
+                        return;
+                      }
+                      const current = formMetadata.availableLanguages || ['th', 'en'];
+                      if (current.includes(cleanLang)) {
+                        setLanguageError(`"${cleanLang}" already exists!`);
+                        return;
+                      }
+                      handleMetaChange('availableLanguages', [...current, cleanLang]);
+                      setNewLanguageCode('');
+                      setLanguageError('');
+                      setShowAddLanguageModal(false);
+                    }}
+                    disabled={!newLanguageCode.trim() || newLanguageCode.trim().length < 2}
+                    className="flex-1 px-3 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-xs transition-all"
+                  >
+                    Add
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {!showAddLanguageModal && (
+              <button
+                type="button"
+                onClick={() => setShowAddLanguageModal(true)}
+                className="w-full px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all shadow-md hover:shadow-lg font-semibold text-sm flex items-center justify-center gap-2 group"
+              >
+                <svg className="w-4 h-4 group-hover:rotate-90 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                Add Language
+              </button>
+            )}
           </div>
 
           {/* General Header Settings */}
-          <div className="space-y-3">
-             <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Header Content</h3>
+          <div className="bg-white rounded-xl p-4 border-2 border-slate-200 shadow-sm space-y-3">
+            <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
+              <svg className="w-4 h-4 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Header Content</h3>
+            </div>
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">
-                Form Title ({editLanguage === 'th' ? 'ไทย' : 'English'})
+                Form Title ({currentLanguage === 'th' ? 'ไทย' : 'English'})
               </label>
               <input
                 type="text"
-                value={getText(formMetadata.title, editLanguage)}
-                onChange={(e) => updateTranslatableMetaField('title', editLanguage, e.target.value)}
+                value={typeof formMetadata.title === 'string' ? formMetadata.title : (formMetadata.title?.[currentLanguage] || '')}
+                onChange={(e) => updateTranslatableMetaField('title', currentLanguage, e.target.value)}
                 className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+                placeholder={currentLanguage === 'th' ? 'ชื่อฟอร์ม (ไทย)' : 'Form Title (English)'}
               />
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">
-                Description ({editLanguage === 'th' ? 'ไทย' : 'English'})
+                Description ({currentLanguage === 'th' ? 'ไทย' : 'English'})
               </label>
               <textarea
                 rows={3}
-                value={getText(formMetadata.description, editLanguage)}
-                onChange={(e) => updateTranslatableMetaField('description', editLanguage, e.target.value)}
+                value={typeof formMetadata.description === 'string' ? formMetadata.description : (formMetadata.description?.[currentLanguage] || '')}
+                onChange={(e) => updateTranslatableMetaField('description', currentLanguage, e.target.value)}
                 className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+                placeholder={currentLanguage === 'th' ? 'คำอธิบาย (ไทย)' : 'Description (English)'}
               />
             </div>
             <div>
@@ -148,8 +309,13 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
           </div>
 
           {/* Header Styling */}
-          <div className="space-y-3 border-t border-slate-100 pt-4">
-            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Header Styling</h3>
+          <div className="bg-white rounded-xl p-4 border-2 border-slate-200 shadow-sm space-y-3">
+            <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
+              <svg className="w-4 h-4 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+              </svg>
+              <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Header Styling</h3>
+            </div>
             
             <div>
                <label className="block text-xs font-medium text-slate-700 mb-1">Background Color</label>
@@ -268,17 +434,23 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
           </div>
 
           {/* Footer Settings */}
-          <div className="space-y-3 border-t border-slate-100 pt-4">
-             <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Footer Content & Style</h3>
+          <div className="bg-white rounded-xl p-4 border-2 border-slate-200 shadow-sm space-y-3">
+            <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
+              <svg className="w-4 h-4 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4\" />
+              </svg>
+              <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Footer Content & Style</h3>
+            </div>
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">
-                Footer Text ({editLanguage === 'th' ? 'ไทย' : 'English'})
+                Footer Text ({currentLanguage === 'th' ? 'ไทย' : 'English'})
               </label>
               <input
                 type="text"
-                value={getText(formMetadata.footerText, editLanguage)}
-                onChange={(e) => updateTranslatableMetaField('footerText', editLanguage, e.target.value)}
+                value={typeof formMetadata.footerText === 'string' ? formMetadata.footerText : (formMetadata.footerText?.[currentLanguage] || '')}
+                onChange={(e) => updateTranslatableMetaField('footerText', currentLanguage, e.target.value)}
                 className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+                placeholder={currentLanguage === 'th' ? 'ข้อความท้ายฟอร์ม (ไทย)' : 'Footer Text (English)'}
               />
             </div>
 
@@ -423,47 +595,85 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   };
 
   return (
+    <>
     <div className="w-80 bg-white border-l border-slate-200 flex flex-col h-full shadow-lg z-10">
-      <div className="p-4 border-b border-slate-200 bg-slate-50">
-        <h2 className="font-semibold text-slate-800">Properties</h2>
-        <div className="text-xs text-slate-500 mt-1 font-mono">{element.id}</div>
+      <div className="p-5 border-b-2 border-slate-200 bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="p-1.5 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg shadow-md">
+            <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+            </svg>
+          </div>
+          <h2 className="font-bold text-lg text-slate-800">Properties</h2>
+        </div>
+        <div className="flex items-center gap-2 ml-9">
+          <span className="px-2 py-0.5 bg-slate-200 text-slate-700 text-[10px] font-mono font-semibold rounded">{element.type.toUpperCase()}</span>
+          <span className="text-xs text-slate-500 font-mono truncate">{element.id}</span>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar">
         {/* Language Selector */}
-        <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3 space-y-2">
-          <label className="block text-xs font-semibold text-indigo-700 uppercase tracking-wider">Editing Language</label>
-          <div className="flex gap-2">
-            {(formMetadata.availableLanguages || ['th', 'en']).map(lang => (
-              <button
-                key={lang}
-                onClick={() => setEditLanguage(lang)}
-                className={`flex-1 py-2 px-3 text-sm font-medium rounded-md transition-all ${
-                  editLanguage === lang 
-                    ? 'bg-indigo-600 text-white shadow' 
-                    : 'bg-white text-slate-700 hover:bg-indigo-100'
-                }`}
-              >
-                {lang === 'th' ? '🇹🇭 ไทย' : '🇬🇧 EN'}
-              </button>
-            ))}
+        <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border-2 border-indigo-200 rounded-xl p-4 space-y-2 shadow-sm">
+          <div className="flex items-center gap-2">
+            <svg className="w-4 h-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+            </svg>
+            <label className="block text-xs font-bold text-indigo-700 uppercase tracking-wider">Editing Language</label>
           </div>
+          <select
+            value={currentLanguage}
+            onChange={(e) => onLanguageChange(e.target.value as Language)}
+            className="w-full px-3 py-2 border-2 border-indigo-300 rounded-lg text-sm font-semibold focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white shadow-sm"
+          >
+            {(formMetadata.availableLanguages || ['th', 'en']).map(lang => (
+              <option key={lang} value={lang}>
+                {lang === 'th' ? '🇹🇭 ไทย (Thai)' : lang === 'en' ? '🇬🇧 EN (English)' : `${lang.toUpperCase()}`}
+              </option>
+            ))}
+          </select>
         </div>
 
         {/* General Settings */}
-        <div className="space-y-3">
-          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">General</h3>
+        <div className="bg-white rounded-xl p-4 border-2 border-slate-200 shadow-sm space-y-3">
+          <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
+            <svg className="w-4 h-4 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide">General</h3>
+          </div>
+
+          {/* Element ID */}
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">
+              Element ID
+            </label>
+            <input
+              type="text"
+              value={element.id}
+              onChange={(e) => {
+                const newId = e.target.value.trim();
+                if (newId && !allElements.some(el => el.id === newId && el.id !== element.id)) {
+                  onUpdate({ ...element, id: newId });
+                }
+              }}
+              className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-slate-50"
+              placeholder="unique-id"
+            />
+            <p className="mt-1 text-[10px] text-slate-500">Unique identifier for this element</p>
+          </div>
           
           {element.type !== 'paragraph' && element.type !== 'image' && (
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">
-                Label ({editLanguage === 'th' ? 'ไทย' : 'English'})
+                Label ({currentLanguage === 'th' ? 'ไทย' : 'English'})
               </label>
               <input
                 type="text"
-                value={getText(element.label, editLanguage)}
-                onChange={(e) => updateTranslatableElementField('label', editLanguage, e.target.value)}
+                value={typeof element.label === 'string' ? element.label : (element.label?.[currentLanguage] || '')}
+                onChange={(e) => updateTranslatableElementField('label', currentLanguage, e.target.value)}
                 className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+                placeholder={currentLanguage === 'th' ? 'ป้ายชื่อ (ไทย)' : 'Label (English)'}
               />
             </div>
           )}
@@ -492,7 +702,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
               >
                 <option value="">(Root)</option>
                 {allElements.filter(e => e.type === 'section' && e.id !== element.id).map(sec => (
-                    <option key={sec.id} value={sec.id}>{getText(sec.label, editLanguage)}</option>
+                    <option key={sec.id} value={sec.id}>{getText(sec.label, currentLanguage)}</option>
                 ))}
               </select>
             </div>
@@ -500,8 +710,13 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
         </div>
         
         {/* Layout / Grid System */}
-        <div className="space-y-3 border-t border-slate-100 pt-4">
-          <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Layout & Grid</h3>
+        <div className="bg-white rounded-xl p-4 border-2 border-slate-200 shadow-sm space-y-3">
+          <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
+            <svg className="w-4 h-4 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h4a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h4a1 1 0 011 1v6a1 1 0 01-1 1h-4a1 1 0 01-1-1v-6zM14 5a1 1 0 011-1h4a1 1 0 011 1v2a1 1 0 01-1 1h-4a1 1 0 01-1-1V5z" />
+            </svg>
+            <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Layout & Grid</h3>
+          </div>
           <div>
             <label className="block text-xs font-medium text-slate-700 mb-1">Width (Column Span)</label>
             <div className="space-y-1">
@@ -515,8 +730,13 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 
         {/* Validation Rules */}
         {(element.type === 'text' || element.type === 'textarea' || element.type === 'number' || element.type === 'date' || element.type === 'email' || element.type === 'file') && (
-          <div className="space-y-3 border-t border-slate-100 pt-4">
-             <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Validation Rules</h3>
+          <div className="bg-white rounded-xl p-4 border-2 border-slate-200 shadow-sm space-y-3">
+            <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
+              <svg className="w-4 h-4 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Validation Rules</h3>
+            </div>
              
              {element.type === 'text' && (
                 <div>
@@ -581,34 +801,46 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 
         {/* Field-Specific Settings */}
         {element.placeholder !== undefined && (
-          <div className="space-y-3 border-t border-slate-100 pt-4">
-            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Placeholder</h3>
+          <div className="bg-white rounded-xl p-4 border-2 border-slate-200 shadow-sm space-y-3">
+            <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
+              <svg className="w-4 h-4 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+              </svg>
+              <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Placeholder</h3>
+            </div>
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">
-                Placeholder ({editLanguage === 'th' ? 'ไทย' : 'English'})
+                Placeholder ({currentLanguage === 'th' ? 'ไทย' : 'English'})
               </label>
               <input
                 type="text"
-                value={getText(element.placeholder, editLanguage)}
-                onChange={(e) => updateTranslatableElementField('placeholder', editLanguage, e.target.value)}
+                value={typeof element.placeholder === 'string' ? element.placeholder : (element.placeholder?.[currentLanguage] || '')}
+                onChange={(e) => updateTranslatableElementField('placeholder', currentLanguage, e.target.value)}
                 className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+                placeholder={currentLanguage === 'th' ? 'ข้อความตัวอย่าง (ไทย)' : 'Placeholder (English)'}
               />
             </div>
           </div>
         )}
 
         {element.type === 'paragraph' && (
-          <div className="space-y-3 border-t border-slate-100 pt-4">
-            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Content</h3>
+          <div className="bg-white rounded-xl p-4 border-2 border-slate-200 shadow-sm space-y-3">
+            <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
+              <svg className="w-4 h-4 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
+              </svg>
+              <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Content</h3>
+            </div>
             <div>
               <label className="block text-xs font-medium text-slate-700 mb-1">
-                Content ({editLanguage === 'th' ? 'ไทย' : 'English'})
+                Content ({currentLanguage === 'th' ? 'ไทย' : 'English'})
               </label>
               <textarea
                 rows={5}
-                value={getText(element.content, editLanguage)}
-                onChange={(e) => updateTranslatableElementField('content', editLanguage, e.target.value)}
+                value={typeof element.content === 'string' ? element.content : (element.content?.[currentLanguage] || '')}
+                onChange={(e) => updateTranslatableElementField('content', currentLanguage, e.target.value)}
                 className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white font-mono"
+                placeholder={currentLanguage === 'th' ? 'เนื้อหา (ไทย)' : 'Content (English)'}
               />
             </div>
           </div>
@@ -616,8 +848,13 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 
         {/* Specifics */}
         {(element.type === 'radio' || element.type === 'checkbox' || element.type === 'select' || element.type === 'image' || element.type === 'signature' || element.type === 'rating') && (
-          <div className="space-y-3 border-t border-slate-100 pt-4">
-             <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Specifics</h3>
+          <div className="bg-white rounded-xl p-4 border-2 border-slate-200 shadow-sm space-y-3">
+            <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
+              <svg className="w-4 h-4 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+              </svg>
+              <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide">Specifics</h3>
+            </div>
              
              {element.type === 'rating' && (
                 <div>
@@ -658,17 +895,23 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                             <div className="w-6 text-slate-400 text-center text-xs">≡</div>
                             <input
                               type="text"
-                              placeholder={`Label (${editLanguage === 'th' ? 'ไทย' : 'EN'})`}
-                              value={getText(opt.label, editLanguage)}
+                              placeholder={currentLanguage === 'th' ? 'ป้ายชื่อ (ไทย)' : 'Label (English)'}
+                              value={typeof opt.label === 'string' ? opt.label : (opt.label?.[currentLanguage] || '')}
                               onChange={(e) => {
                                 if (!element.options) return;
                                 const newOptions = [...element.options];
                                 const current = newOptions[idx].label;
                                 if (isTranslatable(current)) {
-                                  newOptions[idx] = { ...newOptions[idx], label: { ...current, [editLanguage]: e.target.value } };
+                                  newOptions[idx] = { ...newOptions[idx], label: { ...current, [currentLanguage]: e.target.value } };
+                                } else if (typeof current === 'string' && current) {
+                                  // Convert string to translatable, preserve old value
+                                  const trans: TranslatableText = { th: '', en: '' };
+                                  trans[formMetadata.defaultLanguage || 'th'] = current;
+                                  trans[currentLanguage] = e.target.value;
+                                  newOptions[idx] = { ...newOptions[idx], label: trans };
                                 } else {
                                   const trans: TranslatableText = { th: '', en: '' };
-                                  trans[editLanguage] = e.target.value;
+                                  trans[currentLanguage] = e.target.value;
                                   newOptions[idx] = { ...newOptions[idx], label: trans };
                                 }
                                 handleChange('options', newOptions);
@@ -738,61 +981,151 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                    </div>
                 </div>
              )}
+          </div>
+        )}
 
-          {/* Conditional Logic Section */}
-          <div className="space-y-3 border-t border-slate-100 pt-4">
-            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Conditional Logic</h3>
+        {/* Conditional Logic Section - Available for ALL element types */}
+        <div className="space-y-3 bg-gradient-to-br from-purple-50 via-indigo-50 to-pink-50 rounded-xl p-4 border-2 border-purple-200 shadow-md">
+            <div className="flex items-center gap-2 pb-2 border-b-2 border-purple-200">
+              <div className="p-1.5 bg-gradient-to-br from-purple-500 to-indigo-500 rounded-lg shadow-md">
+                <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide">Conditional Logic</h3>
+                <p className="text-[10px] text-slate-600 mt-0.5">Control field visibility</p>
+              </div>
+              {element.logic && element.logic.conditions && element.logic.conditions.length > 0 && (
+                <span className="px-2 py-1 bg-gradient-to-r from-purple-500 to-indigo-500 text-white text-[10px] font-bold rounded-full shadow-sm">
+                  {element.logic.conditions.length} rule{element.logic.conditions.length > 1 ? 's' : ''}
+                </span>
+              )}
+            </div>
             {!element.logic && (
-              <div>
-                <p className="text-sm text-slate-600 mb-2">No logic rules. Use logic to show/hide this field based on other fields.</p>
-                <button onClick={initLogic} className="px-3 py-1.5 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded text-sm">Enable Logic</button>
+              <div className="bg-white rounded-lg p-4 border-2 border-purple-200 shadow-sm">
+                <div className="flex items-start gap-3 mb-3">
+                  <div className="p-2 bg-purple-100 rounded-lg">
+                    <svg className="w-5 h-5 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-bold text-slate-800 mb-1">No logic rules configured</p>
+                    <p className="text-xs text-slate-600 leading-relaxed">Create conditional rules to show/hide this field based on other fields</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={initLogic} 
+                  className="w-full px-4 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 transition-all shadow-md hover:shadow-lg font-semibold text-sm flex items-center justify-center gap-2 group"
+                >
+                  <svg className="w-4 h-4 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                  Enable Logic
+                </button>
               </div>
             )}
 
             {element.logic && (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <div className="text-xs text-slate-500">Combinator</div>
-                  <div className="flex bg-slate-100 p-1 rounded-md border border-slate-200">
-                    <button className={`px-2 text-xs rounded ${element.logic.combinator === 'AND' ? 'bg-white shadow text-indigo-600' : 'text-slate-500'}`} onClick={() => handleChange('logic', { ...element.logic!, combinator: 'AND' })}>AND</button>
-                    <button className={`px-2 text-xs rounded ${element.logic.combinator === 'OR' ? 'bg-white shadow text-indigo-600' : 'text-slate-500'}`} onClick={() => handleChange('logic', { ...element.logic!, combinator: 'OR' })}>OR</button>
+              <div className="space-y-3">
+                <div className="bg-white rounded-lg p-3 border-2 border-purple-200 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <svg className="w-4 h-4 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                      <span className="text-xs font-bold text-slate-700">Combinator</span>
+                    </div>
+                    <div className="flex bg-slate-100 p-1 rounded-lg border-2 border-slate-300 shadow-sm">
+                      <button 
+                        className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
+                          element.logic.combinator === 'AND' 
+                            ? 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-md' 
+                            : 'text-slate-600 hover:bg-slate-200'
+                        }`} 
+                        onClick={() => handleChange('logic', { ...element.logic!, combinator: 'AND' })}
+                      >
+                        AND
+                      </button>
+                      <button 
+                        className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${
+                          element.logic.combinator === 'OR' 
+                            ? 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-md' 
+                            : 'text-slate-600 hover:bg-slate-200'
+                        }`} 
+                        onClick={() => handleChange('logic', { ...element.logic!, combinator: 'OR' })}
+                      >
+                        OR
+                      </button>
+                    </div>
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   {(element.logic.conditions || []).map((cond, idx) => (
-                    <div key={cond.id} className="flex items-center gap-2">
-                      <select value={cond.targetId} onChange={(e) => updateCondition(idx, 'targetId', e.target.value)} className="px-2 py-1 border border-slate-300 rounded text-sm bg-white">
-                        <option value="">-- Select Field --</option>
-                        {potentialLogicTargets.map(t => (
-                          <option key={t.id} value={t.id}>{getText(t.label, editLanguage)}</option>
-                        ))}
-                      </select>
+                    <div key={cond.id} className="bg-white rounded-lg p-3 border-2 border-slate-200 shadow-sm hover:border-purple-300 transition-all">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="flex items-center justify-center w-6 h-6 rounded-full bg-gradient-to-br from-purple-500 to-indigo-500 text-white text-xs font-bold shadow-sm flex-shrink-0">
+                          {idx + 1}
+                        </div>
+                        <button 
+                          onClick={() => removeCondition(idx)} 
+                          className="ml-auto px-2 py-1 text-[10px] font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-md transition-all"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                      <div className="space-y-2">
+                        <select 
+                          value={cond.targetId} 
+                          onChange={(e) => updateCondition(idx, 'targetId', e.target.value)} 
+                          className="w-full px-3 py-2 border-2 border-slate-300 rounded-lg text-sm bg-slate-50 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all font-medium"
+                        >
+                          <option value="">-- Select Field --</option>
+                          {potentialLogicTargets.map(t => (
+                            <option key={t.id} value={t.id}>{getText(t.label, currentLanguage)}</option>
+                          ))}
+                        </select>
 
-                      <select value={cond.operator} onChange={(e) => updateCondition(idx, 'operator', e.target.value)} className="px-2 py-1 border border-slate-300 rounded text-sm bg-white">
-                        <option value="equals">equals</option>
-                        <option value="not_equals">not equals</option>
-                        <option value="contains">contains</option>
-                        <option value="not_contains">not contains</option>
-                      </select>
+                        <select 
+                          value={cond.operator} 
+                          onChange={(e) => updateCondition(idx, 'operator', e.target.value)} 
+                          className="w-full px-3 py-2 border-2 border-slate-300 rounded-lg text-sm bg-slate-50 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all font-medium"
+                        >
+                          <option value="equals">equals</option>
+                          <option value="not_equals">not equals</option>
+                          <option value="contains">contains</option>
+                          <option value="not_contains">not contains</option>
+                        </select>
 
-                      <input type="text" value={cond.value} onChange={(e) => updateCondition(idx, 'value', e.target.value)} placeholder="Value" className="px-2 py-1 border border-slate-300 rounded text-sm bg-white" />
-
-                      <button onClick={() => removeCondition(idx)} className="text-xs text-red-600 px-2 py-1 rounded hover:bg-red-50">Remove</button>
+                        <input 
+                          type="text" 
+                          value={cond.value} 
+                          onChange={(e) => updateCondition(idx, 'value', e.target.value)} 
+                          placeholder="Value" 
+                          className="w-full px-3 py-2 border-2 border-slate-300 rounded-lg text-sm bg-slate-50 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 transition-all font-medium" 
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>
 
-                <div>
-                  <button onClick={addCondition} className="px-3 py-1.5 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded text-sm">+ Add Condition</button>
-                </div>
+                <button 
+                  onClick={addCondition} 
+                  className="w-full px-4 py-2 bg-gradient-to-r from-purple-100 to-indigo-100 text-purple-700 border-2 border-purple-300 rounded-lg hover:from-purple-200 hover:to-indigo-200 transition-all font-semibold text-sm flex items-center justify-center gap-2 shadow-sm hover:shadow group"
+                >
+                  <svg className="w-4 h-4 group-hover:rotate-90 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                  Add Condition
+                </button>
               </div>
             )}
           </div>
-          </div>
-        )}
       </div>
     </div>
+    </>
   );
 };
 

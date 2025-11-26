@@ -1,43 +1,58 @@
 
-import React, { useState, useRef } from 'react';
-import { FormElement, ElementType, FormMetadata, Language } from './types';
+import React, { useState, useRef, useEffect } from 'react';
+import { FormElement, ElementType, FormMetadata, FormProject, Language } from './types';
 import Toolbox from './components/Toolbox';
 import Canvas from './components/Canvas';
 import PropertiesPanel from './components/PropertiesPanel';
 import Preview from './components/Preview';
+import FormSettingsModal from './components/FormSettingsModal';
 
-const App: React.FC = () => {
-  const [elements, setElements] = useState<FormElement[]>([]);
-  const initialPages = [{ id: 'page_1', label: 'Page 1' }];
-  const [pages, setPages] = useState(initialPages);
-  const [currentPageId, setCurrentPageId] = useState(initialPages[0].id);
-  const DRAFT_KEY = 'formflow_builder_draft_v1';
+interface FormBuilderProps {
+  form: FormProject;
+  onSave: (data: { name: string; metadata: FormMetadata; elements: FormElement[]; pages: { id: string; label: string }[] }) => void;
+  onSaveSettings?: (settings: { name: string; codeName?: string; site?: string; description?: string; tags?: string[] }) => void;
+  onBack: () => void;
+  onViewResponses: () => void;
+  onViewRevisions?: () => void;
+}
+
+const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings, onBack, onViewResponses, onViewRevisions }) => {
+  const [formName, setFormName] = useState(form.name);
+  const [elements, setElements] = useState<FormElement[]>(form.elements);
+  const [pages, setPages] = useState(form.pages);
+  const [currentPageId, setCurrentPageId] = useState(form.pages[0]?.id || 'page_1');
+  const [formMeta, setFormMeta] = useState<FormMetadata>(form.metadata);
+  const DRAFT_KEY = `formflow_builder_draft_${form.id}`;
   const [autosaveEnabled, setAutosaveEnabled] = useState(true);
+  const [currentLanguage, setCurrentLanguage] = useState<Language>(form.metadata.defaultLanguage || 'th');
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isPreview, setIsPreview] = useState(false);
   const [showCodeModal, setShowCodeModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
-  // State for global form settings (Header/Footer)
-  const [formMeta, setFormMeta] = useState<FormMetadata>({
-    title: { th: 'ฟอร์มไม่มีชื่อ', en: 'Untitled Form' },
-    description: { th: 'กรุณากรอกข้อมูลในฟอร์มด้านล่าง', en: 'Please fill out the form below.' },
-    logoUrl: '',
-    footerText: { th: '© 2024 FormFlow Builder', en: '© 2024 FormFlow Builder' },
-    headerBackgroundColor: '#ffffff',
-    headerTitleColor: '#1e293b', // slate-800
-    logoPlacement: 'top',
-    logoAlignment: 'center',
-    headerTextAlignment: 'center',
-    logoWidth: 25, // Default logo width percentage
-    footerBackgroundColor: '#ffffff',
-    footerTextColor: '#64748b', // slate-500
-    defaultLanguage: 'th',
-    availableLanguages: ['th', 'en']
-  });
+  const csvInputRef = useRef<HTMLInputElement>(null);
 
-  const [currentLanguage, setCurrentLanguage] = useState<Language>('th');
+  // Keep current language valid whenever available languages change
+  useEffect(() => {
+    const available = formMeta.availableLanguages && formMeta.availableLanguages.length > 0
+      ? formMeta.availableLanguages
+      : ['th', 'en'];
+    if (!available.includes(currentLanguage)) {
+      setCurrentLanguage((available[0] as Language) || 'th');
+    }
+  }, [formMeta.availableLanguages, currentLanguage]);
+
+  // Auto-save to parent component
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (autosaveEnabled) {
+        onSave({ name: formName, metadata: formMeta, elements, pages });
+      }
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [formName, formMeta, elements, pages, autosaveEnabled]);
 
   // Undo/Redo history
   type Snapshot = { elements: FormElement[]; pages: { id: string; label: string }[]; metadata: FormMetadata; selectedId: string | null };
@@ -143,6 +158,8 @@ const App: React.FC = () => {
       image: { th: 'รูปภาพ', en: 'Image' },
       paragraph: { th: 'ข้อมูล', en: 'Information' },
       text: { th: 'ข้อความใหม่', en: 'New Text' },
+      email: { th: 'อีเมลใหม่', en: 'New Email' },
+      phone: { th: 'เบอร์โทรศัพท์ใหม่', en: 'New Phone' },
       number: { th: 'ตัวเลขใหม่', en: 'New Number' },
       textarea: { th: 'ข้อความยาวใหม่', en: 'New Textarea' },
       radio: { th: 'ตัวเลือกเดียวใหม่', en: 'New Radio' },
@@ -158,8 +175,12 @@ const App: React.FC = () => {
       id: generateId(type),
       type,
       label: defaultLabels[type] || { th: 'ใหม่', en: 'New' },
-      placeholder: ['text', 'textarea', 'number', 'email', 'date', 'time'].includes(type) 
-        ? { th: 'กรอกค่า...', en: 'Enter value...' } 
+      placeholder: ['text', 'textarea', 'number', 'email', 'phone', 'date', 'time'].includes(type) 
+        ? type === 'email' 
+          ? { th: 'example@email.com', en: 'example@email.com' }
+          : type === 'phone'
+          ? { th: '0812345678', en: '0812345678' }
+          : { th: 'กรอกค่า...', en: 'Enter value...' }
         : undefined,
       required: false,
       width: '100', // Default full width
@@ -175,7 +196,7 @@ const App: React.FC = () => {
       // Signature default
       signatureHeight: 150,
       // Paragraph default
-      content: type === 'paragraph' ? { th: 'กรอกเนื้อหาข้อความที่นี่ คุณสามารถใช้พื้นที่นี้สำหรับคำแนะนำ ข้อจำกัดความรับผิดชอบ หรือข้อมูลเพิ่มเติม', en: 'Enter your text content here. You can use this space for instructions, disclaimers, or extra information.' } : undefined,
+      content: type === 'paragraph' ? 'กรอกเนื้อหาข้อความที่นี่ คุณสามารถใช้พื้นที่นี้สำหรับคำแนะนำ ข้อจำกัดความรับผิดชอบ หรือข้อมูลเพิ่มเติม' : undefined,
       // Rating default
       ratingMax: 5
     };
@@ -331,6 +352,53 @@ const App: React.FC = () => {
     if (selectedId && idsToDelete.has(selectedId)) setSelectedId(null);
   };
 
+  const duplicateElement = (id: string) => {
+    const element = elements.find(e => e.id === id);
+    if (!element) return;
+
+    // Generate new unique ID
+    const timestamp = Date.now();
+    const newId = `${element.type}_${timestamp}`;
+    
+    // Deep clone the element
+    const duplicated: FormElement = {
+      ...element,
+      id: newId,
+      label: typeof element.label === 'string' 
+        ? `${element.label} (Copy)` 
+        : { ...element.label, th: `${element.label.th} (สำเนา)`, en: `${element.label.en} (Copy)` }
+    };
+
+    // If element is a section, also duplicate its children
+    if (element.type === 'section') {
+      const children = elements.filter(e => e.parentId === id);
+      const newChildren = children.map((child, idx) => ({
+        ...child,
+        id: `${child.type}_${timestamp}_${idx}`,
+        parentId: newId
+      }));
+      
+      // Find position to insert (after original element and its children)
+      const originalIdx = elements.findIndex(e => e.id === id);
+      const lastChildIdx = children.length > 0 
+        ? Math.max(...children.map(c => elements.findIndex(e => e.id === c.id)))
+        : originalIdx;
+      
+      const insertIdx = lastChildIdx + 1;
+      const updated = [...elements];
+      updated.splice(insertIdx, 0, duplicated, ...newChildren);
+      setElements(updated);
+    } else {
+      // Insert right after the original element
+      const idx = elements.findIndex(e => e.id === id);
+      const updated = [...elements];
+      updated.splice(idx + 1, 0, duplicated);
+      setElements(updated);
+    }
+    
+    setSelectedId(newId);
+  };
+
   const moveElement = (dragIndex: number, hoverIndex: number) => {
     const updatedElements = [...elements];
     const [draggedElement] = updatedElements.splice(dragIndex, 1);
@@ -450,10 +518,12 @@ const App: React.FC = () => {
             setPages(imported.pages);
             setCurrentPageId(imported.pages[0].id);
           } else {
-            setPages(initialPages);
-            setCurrentPageId(initialPages[0].id);
+            const defaultPages = [{ id: 'page_1', label: 'Page 1' }];
+            setPages(defaultPages);
+            setCurrentPageId(defaultPages[0].id);
           }
           setSelectedId(null);
+          alert('Form schema imported successfully');
         } else {
           alert('Invalid schema file format');
         }
@@ -464,6 +534,56 @@ const App: React.FC = () => {
     reader.readAsText(file);
     // Reset input
     if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleCSVImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const csv = event.target?.result as string;
+        const lines = csv.split('\n').filter(line => line.trim());
+        
+        if (lines.length < 2) {
+          alert('CSV must have at least a header row and one data row');
+          return;
+        }
+
+        // Parse CSV (simple parser, doesn't handle quotes)
+        const headers = lines[0].split(',').map(h => h.trim());
+        const data = lines.slice(1).map(line => {
+          const values = line.split(',').map(v => v.trim());
+          const row: Record<string, string> = {};
+          headers.forEach((h, i) => {
+            row[h] = values[i] || '';
+          });
+          return row;
+        });
+
+        // Create form elements from headers
+        const newElements: FormElement[] = headers.map((header, idx) => ({
+          id: `imported_${header.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${Date.now()}_${idx}`,
+          type: 'text' as ElementType,
+          label: { th: header, en: header },
+          placeholder: { th: 'กรอกค่า...', en: 'Enter value...' },
+          required: false,
+          width: '100',
+          pageId: currentPageId
+        }));
+
+        setElements([...elements, ...newElements]);
+        setSelectedId(null);
+        alert(`Imported ${headers.length} fields from CSV (${data.length} data rows detected)`);
+      } catch (err) {
+        console.error('CSV import error:', err);
+        alert('Failed to parse CSV file');
+      }
+    };
+    reader.readAsText(file);
+    // Reset input
+    if (csvInputRef.current) csvInputRef.current.value = '';
   };
 
   const selectedElement = elements.find(el => el.id === selectedId);
@@ -484,7 +604,7 @@ const App: React.FC = () => {
 
   return (
     <div className="flex flex-col h-screen supports-[height:100dvh]:h-[100dvh] bg-slate-50">
-      {/* Hidden File Input for Import */}
+      {/* Hidden File Inputs for Import */}
       <input 
         type="file" 
         ref={fileInputRef} 
@@ -493,21 +613,84 @@ const App: React.FC = () => {
         className="hidden" 
         aria-label="Import form schema file"
       />
+      <input 
+        type="file" 
+        ref={csvInputRef} 
+        onChange={handleCSVImport} 
+        accept=".csv" 
+        className="hidden" 
+        aria-label="Import CSV file"
+      />
 
       {/* Header */}
       <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 md:px-6 shadow-sm z-10 flex-shrink-0">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold">F</div>
-          <h1 className="text-lg md:text-xl font-semibold text-slate-800 truncate">FormFlow Builder</h1>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={onBack}
+            className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+            title="Back to list"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+          </button>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold">F</div>
+            <input
+              type="text"
+              value={formName}
+              onChange={(e) => setFormName(e.target.value)}
+              className="text-lg md:text-xl font-semibold text-slate-800 bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded px-2"
+              placeholder="Form name..."
+            />
+          </div>
+          <span className={`px-2 py-1 text-xs font-medium rounded border ${
+            form.status === 'published' 
+              ? 'bg-green-100 text-green-700 border-green-200' 
+              : form.status === 'archived'
+              ? 'bg-amber-100 text-amber-700 border-amber-200'
+              : 'bg-slate-100 text-slate-700 border-slate-200'
+          }`}>
+            {form.status === 'published' ? 'เผยแพร่แล้ว' : form.status === 'archived' ? 'เก็บถาวร' : 'แบบร่าง'}
+          </span>
         </div>
         
         <div className="flex items-center gap-3">
           <button
-            onClick={triggerImport}
+            onClick={() => setShowSettingsModal(true)}
             className="hidden md:flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded-md hover:bg-slate-50 hover:text-indigo-600 transition-all shadow-sm"
-            title="Import Schema"
+            title="Form Settings"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <span>Settings</span>
+          </button>
+
+          {onViewRevisions && (
+            <button
+              onClick={onViewRevisions}
+              className="hidden md:flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded-md hover:bg-slate-50 hover:text-amber-600 transition-all shadow-sm"
+              title="View Revision History"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>Revisions</span>
+            </button>
+          )}
+
+          <button
+            onClick={() => setShowImportModal(true)}
+            className="hidden md:flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded-md hover:bg-slate-50 hover:text-green-600 transition-all shadow-sm"
+            title="Import Data"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="17 8 12 3 7 8"></polyline>
+              <line x1="12" y1="3" x2="12" y2="15"></line>
+            </svg>
             <span>Import</span>
           </button>
 
@@ -522,30 +705,6 @@ const App: React.FC = () => {
               <line x1="12" y1="15" x2="12" y2="3"></line>
             </svg>
             <span>Export</span>
-          </button>
-
-          <button
-            onClick={saveDraft}
-            className="hidden md:flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded-md hover:bg-slate-50 hover:text-indigo-600 transition-all shadow-sm"
-            title="Save Draft locally"
-          >
-            Save Draft
-          </button>
-
-          <button
-            onClick={loadDraft}
-            className="hidden md:flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded-md hover:bg-slate-50 hover:text-indigo-600 transition-all shadow-sm"
-            title="Load Draft from localStorage"
-          >
-            Load Draft
-          </button>
-
-          <button
-            onClick={clearDraft}
-            className="hidden md:flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-red-600 bg-red-50 border border-red-100 rounded-md hover:bg-red-100 transition-all shadow-sm"
-            title="Clear Draft"
-          >
-            Clear Draft
           </button>
 
           <label className="hidden md:flex items-center gap-2 text-sm ml-2">
@@ -629,7 +788,12 @@ const App: React.FC = () => {
         {isPreview ? (
           <div className="flex-1 bg-slate-100 overflow-y-auto w-full scroll-smooth">
             <div className="min-h-full w-full p-4 md:p-8 flex justify-center items-start pb-24">
-              <Preview elements={elements} meta={formMeta} currentLanguage={currentLanguage} onLanguageChange={setCurrentLanguage} />
+              <Preview 
+                elements={elements} 
+                meta={formMeta} 
+                currentLanguage={currentLanguage}
+                onLanguageChange={setCurrentLanguage}
+              />
             </div>
           </div>
         ) : (
@@ -643,6 +807,7 @@ const App: React.FC = () => {
               onSelect={setSelectedId} 
               onMove={moveElement}
               onDelete={deleteElement}
+              onDuplicate={duplicateElement}
               onReparent={reparentElement}
               onUpdateMeta={setFormMeta}
               onAdd={addElement}
@@ -687,8 +852,78 @@ const App: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Form Settings Modal */}
+      {showSettingsModal && onSaveSettings && (
+        <FormSettingsModal
+          form={form}
+          onSave={(settings) => {
+            onSaveSettings(settings);
+            setFormName(settings.name);
+          }}
+          onClose={() => setShowSettingsModal(false)}
+        />
+      )}
+
+      {/* Import Modal */}
+      {showImportModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowImportModal(false)}>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
+            <div className="p-4 border-b border-slate-200 flex justify-between items-center">
+              <h3 className="font-semibold text-slate-800">Import Data</h3>
+              <button onClick={() => setShowImportModal(false)} className="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="space-y-3">
+                <button
+                  onClick={() => {
+                    fileInputRef.current?.click();
+                    setShowImportModal(false);
+                  }}
+                  className="w-full p-4 bg-indigo-50 border-2 border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors text-left"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-indigo-600 rounded-lg flex items-center justify-center text-white text-xl">
+                      📄
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-slate-800">Import JSON Schema</h4>
+                      <p className="text-xs text-slate-500">Import complete form structure (metadata, elements, pages)</p>
+                    </div>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => {
+                    csvInputRef.current?.click();
+                    setShowImportModal(false);
+                  }}
+                  className="w-full p-4 bg-green-50 border-2 border-green-200 rounded-lg hover:bg-green-100 transition-colors text-left"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-green-600 rounded-lg flex items-center justify-center text-white text-xl">
+                      📊
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-slate-800">Import CSV Fields</h4>
+                      <p className="text-xs text-slate-500">Create form fields from CSV column headers</p>
+                    </div>
+                  </div>
+                </button>
+              </div>
+
+              <div className="pt-3 border-t border-slate-200">
+                <p className="text-xs text-slate-500">
+                  <strong>JSON:</strong> Replaces entire form structure<br/>
+                  <strong>CSV:</strong> Adds new fields from column headers
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
-export default App;
+export default FormBuilder;

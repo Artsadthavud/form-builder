@@ -2,10 +2,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FormElement, Condition, FormMetadata, Language } from '../types';
 import { getText } from '../utils/i18n';
+import { buildCustomStyles, buildCustomClasses } from '../utils/styles';
 
 interface PreviewProps {
   elements: FormElement[];
   meta: FormMetadata;
+  currentLanguage: Language;
+  onLanguageChange: (lang: Language) => void;
 }
 
 // Sub-component for the interactive signature pad
@@ -221,11 +224,10 @@ const SignaturePad: React.FC<{ id: string; value: string; height?: number; onCha
 };
 
 
-const Preview: React.FC<PreviewProps> = ({ elements, meta }) => {
+const Preview: React.FC<PreviewProps> = ({ elements, meta, currentLanguage, onLanguageChange }) => {
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [visibleIds, setVisibleIds] = useState<Set<string>>(new Set());
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [currentLanguage, setCurrentLanguage] = useState<Language>(meta.defaultLanguage || 'th');
 
   useEffect(() => {
     const newVisible = new Set<string>();
@@ -411,7 +413,10 @@ const Preview: React.FC<PreviewProps> = ({ elements, meta }) => {
     }
 
     return (
-      <div className="space-y-1.5">
+      <div 
+        className={`space-y-1.5 ${buildCustomClasses(el)}`}
+        style={buildCustomStyles(el)}
+      >
         <label className="block text-sm font-medium text-slate-700">
           {getText(el.label, currentLanguage)} {el.required && <span className="text-red-500">*</span>}
         </label>
@@ -425,6 +430,38 @@ const Preview: React.FC<PreviewProps> = ({ elements, meta }) => {
             onChange={(e) => handleChange(el.id, e.target.value)}
             maxLength={el.maxLength}
           />
+        )}
+
+        {el.type === 'email' && (
+          <input 
+            type="email"
+            placeholder={getText(el.placeholder, currentLanguage)}
+            className={`block w-full bg-white rounded-md shadow-sm focus:ring-indigo-500 sm:text-sm border p-2 ${error ? 'border-red-300 focus:border-red-500' : 'border-slate-300 focus:border-indigo-500'}`}
+            value={fieldValue}
+            onChange={(e) => handleChange(el.id, e.target.value)}
+            maxLength={el.maxLength}
+          />
+        )}
+
+        {el.type === 'phone' && (
+          <div className="flex gap-2">
+            {el.countryCode && (
+              <input 
+                type="text"
+                value={el.countryCode}
+                disabled
+                className="w-16 bg-slate-100 rounded-md shadow-sm text-sm border border-slate-300 p-2 text-center"
+              />
+            )}
+            <input 
+              type="tel"
+              placeholder={getText(el.placeholder, currentLanguage)}
+              className={`block flex-1 bg-white rounded-md shadow-sm focus:ring-indigo-500 sm:text-sm border p-2 ${error ? 'border-red-300 focus:border-red-500' : 'border-slate-300 focus:border-indigo-500'}`}
+              value={fieldValue}
+              onChange={(e) => handleChange(el.id, e.target.value)}
+              maxLength={el.maxLength}
+            />
+          </div>
         )}
 
         {el.type === 'number' && (
@@ -608,7 +645,7 @@ const Preview: React.FC<PreviewProps> = ({ elements, meta }) => {
             {meta.availableLanguages.map(lang => (
               <button
                 key={lang}
-                onClick={() => setCurrentLanguage(lang)}
+                onClick={() => onLanguageChange(lang)}
                 className={`px-4 py-2 text-sm font-medium transition-colors ${
                   currentLanguage === lang 
                     ? 'bg-indigo-600 text-white' 

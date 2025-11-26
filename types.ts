@@ -1,5 +1,5 @@
 
-export type ElementType = 'text' | 'number' | 'textarea' | 'radio' | 'checkbox' | 'select' | 'section' | 'signature' | 'image' | 'date' | 'time' | 'file' | 'rating' | 'paragraph';
+export type ElementType = 'text' | 'email' | 'phone' | 'number' | 'textarea' | 'radio' | 'checkbox' | 'select' | 'section' | 'signature' | 'image' | 'date' | 'time' | 'file' | 'rating' | 'paragraph';
 
 export type Language = 'th' | 'en';
 
@@ -85,4 +85,100 @@ export interface FormElement {
   pattern?: string;   // Regex pattern
   validationType?: 'text' | 'email'; // specific format validation
   customErrorMsg?: string; // Custom validation message
+  
+  // Phone specific
+  phoneFormat?: 'international' | 'national' | 'custom';
+  countryCode?: string; // e.g., '+66', '+1'
+  
+  // Custom Styling
+  customClass?: string; // CSS classes
+  customStyles?: {
+    backgroundColor?: string;
+    textColor?: string;
+    borderColor?: string;
+    borderWidth?: string;
+    borderRadius?: string;
+    fontSize?: string;
+    fontWeight?: string;
+    padding?: string;
+    margin?: string;
+  };
+  
+  // File upload specific
+  allowMultiple?: boolean;
+  maxFileSize?: number; // in MB
+  
+  // Validation object
+  validation?: {
+    min?: number;
+    max?: number;
+    minLength?: number;
+    maxLength?: number;
+    pattern?: string;
+    acceptedFileTypes?: string[];
+  };
+  
+  // For sections
+  children?: FormElement[];
+  
+  // For rating
+  maxRating?: number;
+}
+
+// Form Project Types
+export type FormStatus = 'draft' | 'published' | 'archived';
+
+export interface FormRevision {
+  id: string;
+  version: number;
+  name: string;
+  metadata: FormMetadata;
+  elements: FormElement[];
+  pages: { id: string; label: string }[];
+  createdAt: string;
+  createdBy?: string;
+  description?: string; // คำอธิบายการเปลี่ยนแปลง
+}
+
+export interface FormProject {
+  id: string;
+  name: string;
+  codeName?: string; // รหัสฟอร์ม สำหรับอ้างอิง
+  site?: string; // ชื่อ site/project ที่ใช้ฟอร์ม
+  status: FormStatus;
+  metadata: FormMetadata;
+  elements: FormElement[];
+  pages: { id: string; label: string }[];
+  createdAt: string;
+  updatedAt: string;
+  publishedAt?: string;
+  version: number;
+  shareUrl?: string;
+  submissionCount?: number;
+  revisions?: FormRevision[]; // เก็บประวัติการแก้ไข
+  tags?: string[]; // แท็กสำหรับจัดหมวดหมู่
+  description?: string; // คำอธิบายฟอร์ม
+}
+
+// Form Response Types
+export interface FormResponse {
+  id: string;
+  formId: string;
+  data: Record<string, any>;
+  submittedAt: string;
+  completionTime?: number; // in seconds
+  metadata?: {
+    userAgent?: string;
+    language?: Language;
+    ipAddress?: string;
+    screenResolution?: string;
+  };
+}
+
+export interface FormStatistics {
+  formId: string;
+  totalSubmissions: number;
+  averageCompletionTime: number;
+  completionRate: number;
+  lastSubmission?: string;
 }

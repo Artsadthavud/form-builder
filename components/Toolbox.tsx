@@ -9,6 +9,8 @@ interface ToolboxProps {
 const groupedTools: Record<string, { type: ElementType; icon: string; label: string }[]> = {
   Basic: [
     { type: 'text', label: 'Text Input', icon: 'T' },
+    { type: 'email', label: 'Email', icon: '📧' },
+    { type: 'phone', label: 'Phone', icon: '📞' },
     { type: 'textarea', label: 'Text Area', icon: '≡' },
     { type: 'number', label: 'Number Input', icon: '#' },
     { type: 'paragraph', label: 'Text Block', icon: '¶' },
