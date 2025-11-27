@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { FormElement, Condition, FormMetadata, Language } from '../types';
+import { FormElement, Condition, FormMetadata, Language, FormPage } from '../types';
 import { getText } from '../utils/i18n';
 import { buildCustomStyles, buildCustomClasses } from '../utils/styles';
 import { resolveTemplateWithSources } from '../utils/templateResolver';
@@ -8,9 +8,11 @@ import mockFetch from '../utils/mockApi';
 
 interface PreviewProps {
   elements: FormElement[];
+  pages?: FormPage[];
   meta: FormMetadata;
-  currentLanguage: Language;
-  onLanguageChange: (lang: Language) => void;
+  currentLanguage?: Language;
+  onLanguageChange?: (lang: Language) => void;
+  onClose: () => void;
 }
 
 // Sub-component for the interactive signature pad
@@ -226,7 +228,20 @@ const SignaturePad: React.FC<{ id: string; value: string; height?: number; onCha
 };
 
 
-const Preview: React.FC<PreviewProps> = ({ elements, meta, currentLanguage, onLanguageChange }) => {
+const Preview: React.FC<PreviewProps> = ({ 
+  elements, 
+  pages,
+  meta, 
+  currentLanguage = 'th',
+  onLanguageChange,
+  onClose 
+}) => {
+  const [lang, setLang] = useState<Language>(currentLanguage);
+  
+  const handleLanguageChange = (newLang: Language) => {
+    setLang(newLang);
+    onLanguageChange?.(newLang);
+  };
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [visibleIds, setVisibleIds] = useState<Set<string>>(new Set());
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -774,7 +789,22 @@ const Preview: React.FC<PreviewProps> = ({ elements, meta, currentLanguage, onLa
   };
 
   return (
-    <div className="w-full max-w-3xl mx-auto">
+    <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 overflow-y-auto">
+      <div className="min-h-screen py-8 px-4">
+        <div className="max-w-4xl mx-auto bg-slate-50 rounded-lg shadow-2xl relative">
+          {/* Close Button */}
+          <button 
+            onClick={onClose}
+            className="sticky top-4 right-4 ml-auto z-50 flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors shadow-lg mb-4"
+            title="Close Preview"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            <span>Exit Preview</span>
+          </button>
+          
+          <div className="w-full max-w-3xl mx-auto p-6">
       {/* Language Selector */}
       {meta.availableLanguages && meta.availableLanguages.length > 1 && (
         <div className="mb-4 flex justify-end">
@@ -863,6 +893,9 @@ const Preview: React.FC<PreviewProps> = ({ elements, meta, currentLanguage, onLa
         }}
       >
           {getText(meta.footerText, currentLanguage)}
+      </div>
+      </div>
+        </div>
       </div>
     </div>
   );

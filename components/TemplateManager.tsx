@@ -674,7 +674,7 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
         category: 'form',
         isBuiltIn: false,
         createdAt: new Date().toISOString(),
-        elements: currentElements.map(el => ({
+        elements: (currentElements || []).map(el => ({
           ...el,
           id: el.id, // Keep original IDs, will be regenerated when applied
         })),
@@ -735,15 +735,17 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
     }
     
     // Generate new unique IDs for elements
-    const newElements: FormElement[] = template.elements.map(el => ({
+    const timestamp = Date.now();
+    const newElements: FormElement[] = template.elements.map((el, idx) => ({
       ...el,
-      id: generateId(),
-      options: el.options?.map(opt => ({
+      id: `${el.type}_${timestamp}_${idx}`,
+      options: el.options?.map((opt, optIdx) => ({
         ...opt,
-        id: `opt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        id: `opt_${timestamp}_${idx}_${optIdx}`,
       })),
     })) as FormElement[];
     
+    console.log('Applying body template:', { mode, newElements });
     onApplyBody(newElements, mode);
     setShowApplyBodyConfirm(null);
   };
@@ -898,13 +900,13 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
                 </h3>
                 <p className="text-sm text-violet-700">
                   {activeTab === 'body' 
-                    ? `Save your current ${currentElements.length} element(s) as a reusable template`
+                    ? `Save your current ${(currentElements || []).length} element(s) as a reusable template`
                     : 'Save your current design as a reusable template'}
                 </p>
               </div>
               <button
                 onClick={() => setShowSaveModal(true)}
-                disabled={activeTab === 'body' && currentElements.length === 0}
+                disabled={activeTab === 'body' && (currentElements || []).length === 0}
                 className="px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -943,7 +945,7 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
                         )}
                         {template.category === 'form' && template.elements && (
                           <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-medium rounded">
-                            {template.elements.length} elements
+                            {(template.elements || []).length} elements
                           </span>
                         )}
                       </div>
@@ -962,9 +964,12 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
                     ) : (
                       <button
                         onClick={() => {
+                          console.log('Apply Template clicked', { activeTab, template });
                           if (activeTab === 'header') {
+                            console.log('Applying header style:', template.headerStyle);
                             onApplyHeader(template.headerStyle);
                           } else {
+                            console.log('Applying footer style:', template.footerStyle);
                             onApplyFooter(template.footerStyle);
                           }
                         }}
@@ -1037,7 +1042,7 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <span>Will save {currentElements.length} element(s) from your current form</span>
+                    <span>Will save {(currentElements || []).length} element(s) from your current form</span>
                   </div>
                 </div>
               )}
@@ -1110,13 +1115,13 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
               </label>
             </div>
 
-            {applyBodyMode === 'replace' && currentElements.length > 0 && (
+            {applyBodyMode === 'replace' && (currentElements || []).length > 0 && (
               <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 mb-4">
                 <div className="flex items-center gap-2 text-amber-700 text-sm">
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                   </svg>
-                  <span>This will remove your {currentElements.length} existing element(s)</span>
+                  <span>This will remove your {(currentElements || []).length} existing element(s)</span>
                 </div>
               </div>
             )}

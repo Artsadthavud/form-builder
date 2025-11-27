@@ -1,6 +1,5 @@
-
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
-import { FormElement, ElementType, FormMetadata, FormProject, Language, FormPage, Calculation, SkipRule, FormTemplate, Signer, SignerMode } from './types';
+import { FormElement, ElementType, FormMetadata, FormProject, Language, FormPage, Signer, SignerMode } from './types';
 import Toolbox from './components/Toolbox';
 import Canvas from './components/Canvas';
 import PropertiesPanel from './components/PropertiesPanel';
@@ -9,6 +8,8 @@ import FormSettingsModal from './components/FormSettingsModal';
 import CalculationBuilder from './components/CalculationBuilder';
 import SkipLogicBuilder from './components/SkipLogicBuilder';
 import TemplateManager from './components/TemplateManager';
+import { useFormBuilderState } from './hooks/useFormBuilderState';
+import { useAutosave, useAutoSaveToParent } from './hooks/useAutosave';
 
 interface FormBuilderProps {
   form: FormProject;
@@ -21,17 +22,10 @@ interface FormBuilderProps {
 
 const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings, onBack, onViewResponses, onViewRevisions }) => {
   const [formName, setFormName] = useState(form.name);
-  const [elements, setElements] = useState<FormElement[]>(form.elements);
-  const [pages, setPages] = useState(form.pages);
-  const [currentPageId, setCurrentPageId] = useState(form.pages[0]?.id || 'page_1');
-  const [formMeta, setFormMeta] = useState<FormMetadata>(form.metadata);
-  const [signers, setSigners] = useState<Signer[]>(form.signers || []);
-  const [signerMode, setSignerMode] = useState<SignerMode>(form.signerMode || 'single');
   const DRAFT_KEY = `formflow_builder_draft_${form.id}`;
   const [autosaveEnabled, setAutosaveEnabled] = useState(true);
   const [currentLanguage, setCurrentLanguage] = useState<Language>(form.metadata.defaultLanguage || 'th');
 
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isPreview, setIsPreview] = useState(false);
   const [showCodeModal, setShowCodeModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
@@ -43,6 +37,36 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
   const fileInputRef = useRef<HTMLInputElement>(null);
   const csvInputRef = useRef<HTMLInputElement>(null);
 
+  // Use the new custom hook for state management
+  const {
+    elements,
+    pages,
+    formMeta,
+    signers,
+    signerMode,
+    selectedId,
+    currentPageId,
+    historyPast,
+    historyFuture,
+    setSigners,
+    setSignerMode,
+    setSelectedId,
+    setCurrentPageId,
+    setElements,
+    setPages,
+    setFormMeta,
+    updateElement,
+    deleteElement,
+    duplicateElement,
+    moveElement,
+    reparentElement,
+    setAll,
+    undo,
+    redo,
+    canUndo,
+    canRedo
+  } = useFormBuilderState({ initialForm: form });
+
   // Sync signers from form prop when it changes (e.g., from settings modal)
   useEffect(() => {
     if (form.signers) {
@@ -51,7 +75,7 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
     if (form.signerMode) {
       setSignerMode(form.signerMode);
     }
-  }, [form.signers, form.signerMode]);
+  }, [form.signers, form.signerMode, setSigners, setSignerMode]);
 
   // Keep current language valid whenever available languages change
   useEffect(() => {
@@ -63,80 +87,24 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
     }
   }, [formMeta.availableLanguages, currentLanguage]);
 
-  // Auto-save to parent component
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (autosaveEnabled) {
-        onSave({ name: formName, metadata: formMeta, elements, pages, signers, signerMode });
-      }
-    }, 1000);
-    return () => clearTimeout(timer);
-  }, [formName, formMeta, elements, pages, signers, signerMode, autosaveEnabled]);
+  // --- Autosave Integration ---
 
-  // Undo/Redo history
-  type Snapshot = { elements: FormElement[]; pages: { id: string; label: string }[]; metadata: FormMetadata; selectedId: string | null };
-  const [historyPast, setHistoryPast] = useState<Snapshot[]>([]);
-  const [historyFuture, setHistoryFuture] = useState<Snapshot[]>([]);
-  const lastSnapshotRef = React.useRef<Snapshot | null>(null);
-  const HISTORY_LIMIT = 50;
+  // 1. Local Draft Autosave
+  useAutosave(
+    { metadata: formMeta, elements, pages },
+    {
+      key: DRAFT_KEY,
+      enabled: autosaveEnabled,
+      delay: 1200,
+    }
+  );
 
-  const takeSnapshot = React.useCallback(() => {
-    const snapshot: Snapshot = { elements, pages, metadata: formMeta, selectedId };
-    return snapshot;
-  }, [elements, pages, formMeta, selectedId]);
-
-  // Record snapshot when core state changes, debounced slightly
-  React.useEffect(() => {
-    const timer = setTimeout(() => {
-      try {
-        const snapshot = takeSnapshot();
-        const last = lastSnapshotRef.current;
-        const lastJson = last ? JSON.stringify(last) : null;
-        const curJson = JSON.stringify(snapshot);
-        if (lastJson === curJson) return; // no meaningful change
-        if (last) {
-          setHistoryPast(prev => {
-            const next = [...prev, last];
-            if (next.length > HISTORY_LIMIT) return next.slice(next.length - HISTORY_LIMIT);
-            return next;
-          });
-        }
-        // Clear future on new changes
-        setHistoryFuture([]);
-        lastSnapshotRef.current = snapshot;
-      } catch (e) {
-        console.error('Snapshot failed', e);
-      }
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [elements, pages, formMeta, selectedId, takeSnapshot]);
-
-  const undo = useCallback(() => {
-    if (historyPast.length === 0) return;
-    const prev = historyPast[historyPast.length - 1];
-    const present = takeSnapshot();
-    setHistoryPast(h => h.slice(0, h.length - 1));
-    setHistoryFuture(f => [present, ...f].slice(0, HISTORY_LIMIT));
-    // apply prev
-    setElements(prev.elements);
-    setPages(prev.pages);
-    setFormMeta(prev.metadata);
-    setSelectedId(prev.selectedId);
-    lastSnapshotRef.current = prev;
-  }, [historyPast, takeSnapshot]);
-
-  const redo = useCallback(() => {
-    if (historyFuture.length === 0) return;
-    const next = historyFuture[0];
-    const present = takeSnapshot();
-    setHistoryFuture(f => f.slice(1));
-    setHistoryPast(p => [...p, present].slice(-HISTORY_LIMIT));
-    setElements(next.elements);
-    setPages(next.pages);
-    setFormMeta(next.metadata);
-    setSelectedId(next.selectedId);
-    lastSnapshotRef.current = next;
-  }, [historyFuture, takeSnapshot]);
+  // 2. Parent Component Autosave (Debounced onSave)
+  useAutoSaveToParent(
+    { name: formName, metadata: formMeta, elements, pages, signers, signerMode },
+    (data) => onSave(data),
+    { enabled: autosaveEnabled, delay: 1000 }
+  );
 
   // Keyboard shortcuts for undo/redo
   React.useEffect(() => {
@@ -158,7 +126,7 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [undo, redo, historyPast.length, historyFuture.length]);
+  }, [undo, redo]);
 
   // Helper to generate unique IDs
   const generateId = useCallback((type: string) => {
@@ -246,54 +214,38 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
     } else {
       newElement.pageId = currentPageId;
     }
-    // If explicit options provided (e.g., dropped into a section), honor them first
+    
+    // Logic to determine insertion position
+    let updated = [...elements];
+
     if (opts && (opts.parentId || opts.insertAfterId || typeof opts.insertIndex === 'number')) {
       if (opts.parentId) {
         newElement.parentId = opts.parentId;
 
         if (typeof opts.insertIndex === 'number') {
-          const updated = [...elements];
           updated.splice(opts.insertIndex, 0, newElement);
-          setElements(updated);
-          setSelectedId(newElement.id);
-          return;
-        }
-
-        // find last child index of the parent
-        const lastChildIndex = elements
-          .map((el, idx) => ({ el, idx }))
-          .filter(({ el }) => el.parentId === opts.parentId)
-          .map(({ idx }) => idx)
-          .pop();
-
-        if (typeof lastChildIndex !== 'undefined') {
-          const updated = [...elements];
-          updated.splice(lastChildIndex + 1, 0, newElement);
-          setElements(updated);
         } else {
-          const parentIndex = elements.findIndex(e => e.id === opts.parentId);
-          const updated = [...elements];
-          updated.splice(parentIndex + 1, 0, newElement);
-          setElements(updated);
+          // find last child index of the parent
+          const lastChildIndex = elements
+            .map((el, idx) => ({ el, idx }))
+            .filter(({ el }) => el.parentId === opts.parentId)
+            .map(({ idx }) => idx)
+            .pop();
+
+          if (typeof lastChildIndex !== 'undefined') {
+            updated.splice(lastChildIndex + 1, 0, newElement);
+          } else {
+            const parentIndex = elements.findIndex(e => e.id === opts.parentId);
+            updated.splice(parentIndex + 1, 0, newElement);
+          }
         }
-
-        setSelectedId(newElement.id);
-        return;
-      }
-
-      if (opts.insertAfterId) {
+      } else if (opts.insertAfterId) {
         newElement.parentId = elements.find(e => e.id === opts.insertAfterId)?.parentId;
         const idx = elements.findIndex(e => e.id === opts.insertAfterId);
-        const updated = [...elements];
         updated.splice(idx + 1, 0, newElement);
-        setElements(updated);
-        setSelectedId(newElement.id);
-        return;
       }
-    }
-
-    // Insert logic: if something is selected, prefer adding inside a section or after the selected element
-    if (selectedId) {
+    } else if (selectedId) {
+      // Insert logic: if something is selected, prefer adding inside a section or after the selected element
       const selected = elements.find(e => e.id === selectedId);
       if (selected) {
         // If selected is a section, add as its child (append to the last child)
@@ -308,42 +260,32 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
             .pop();
 
           if (typeof lastChildIndex !== 'undefined') {
-            const updated = [...elements];
             updated.splice(lastChildIndex + 1, 0, newElement);
-            setElements(updated);
           } else {
             // insert right after the section element
             const sectionIndex = elements.findIndex(e => e.id === selected.id);
-            const updated = [...elements];
             updated.splice(sectionIndex + 1, 0, newElement);
-            setElements(updated);
           }
-
-          setSelectedId(newElement.id);
-          return;
+        } else {
+          // If selected is a normal element, insert after it and keep the same parentId
+          newElement.parentId = selected.parentId;
+          const selIndex = elements.findIndex(e => e.id === selected.id);
+          if (selIndex >= 0) {
+            updated.splice(selIndex + 1, 0, newElement);
+          }
         }
-
-        // If selected is a normal element, insert after it and keep the same parentId
-        newElement.parentId = selected.parentId;
-        const selIndex = elements.findIndex(e => e.id === selected.id);
-        if (selIndex >= 0) {
-          const updated = [...elements];
-          updated.splice(selIndex + 1, 0, newElement);
-          setElements(updated);
-          setSelectedId(newElement.id);
-          return;
-        }
+      } else {
+        updated.push(newElement);
       }
+    } else {
+      // Default: append to the end
+      updated.push(newElement);
     }
 
-    // Default: append to the end
-    setElements([...elements, newElement]);
+    // Use setElements from hook to update state and push history
+    setElements(updated);
     setSelectedId(newElement.id);
   };
-
-  const updateElement = useCallback((updated: FormElement) => {
-    setElements(prev => prev.map(el => el.id === updated.id ? updated : el));
-  }, []);
 
   const requestLabelChange = (id: string, newLabel: string) => {
     const slugify = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
@@ -370,98 +312,6 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
     if (selectedId === id) setSelectedId(candidate);
   };
 
-  const deleteElement = (id: string) => {
-    // Recursively delete children if a section is deleted
-    const idsToDelete = new Set<string>([id]);
-    
-    const findChildren = (parentId: string) => {
-      elements.forEach(el => {
-        if (el.parentId === parentId) {
-          idsToDelete.add(el.id);
-          if (el.type === 'section') {
-            findChildren(el.id);
-          }
-        }
-      });
-    };
-    findChildren(id);
-
-    setElements(elements.filter(el => !idsToDelete.has(el.id)));
-    if (selectedId && idsToDelete.has(selectedId)) setSelectedId(null);
-  };
-
-  const duplicateElement = (id: string) => {
-    const element = elements.find(e => e.id === id);
-    if (!element) return;
-
-    // Generate new unique ID
-    const timestamp = Date.now();
-    const newId = `${element.type}_${timestamp}`;
-    
-    // Deep clone the element
-    const duplicated: FormElement = {
-      ...element,
-      id: newId,
-      label: typeof element.label === 'string' 
-        ? `${element.label} (Copy)` 
-        : { ...element.label, th: `${element.label.th} (สำเนา)`, en: `${element.label.en} (Copy)` }
-    };
-
-    // If element is a section, also duplicate its children
-    if (element.type === 'section') {
-      const children = elements.filter(e => e.parentId === id);
-      const newChildren = children.map((child, idx) => ({
-        ...child,
-        id: `${child.type}_${timestamp}_${idx}`,
-        parentId: newId
-      }));
-      
-      // Find position to insert (after original element and its children)
-      const originalIdx = elements.findIndex(e => e.id === id);
-      const lastChildIdx = children.length > 0 
-        ? Math.max(...children.map(c => elements.findIndex(e => e.id === c.id)))
-        : originalIdx;
-      
-      const insertIdx = lastChildIdx + 1;
-      const updated = [...elements];
-      updated.splice(insertIdx, 0, duplicated, ...newChildren);
-      setElements(updated);
-    } else {
-      // Insert right after the original element
-      const idx = elements.findIndex(e => e.id === id);
-      const updated = [...elements];
-      updated.splice(idx + 1, 0, duplicated);
-      setElements(updated);
-    }
-    
-    setSelectedId(newId);
-  };
-
-  const moveElement = useCallback((dragIndex: number, hoverIndex: number) => {
-    setElements(prev => {
-      const updated = [...prev];
-      const [dragged] = updated.splice(dragIndex, 1);
-      updated.splice(hoverIndex, 0, dragged);
-      return updated;
-    });
-  }, []);
-
-  const reparentElement = (elementId: string, newParentId?: string) => {
-    if (elementId === newParentId) return; // Cannot parent to self
-    
-    // Check for circular dependency
-    let current = elements.find(e => e.id === newParentId);
-    while (current) {
-      if (current.id === elementId) return; // Ancestor cannot be child of descendant
-      if (!current.parentId) break;
-      current = elements.find(e => e.id === current?.parentId);
-    }
-
-    setElements(elements.map(el => 
-      el.id === elementId ? { ...el, parentId: newParentId } : el
-    ));
-  };
-
   const exportSchema = () => {
     const schema = {
       metadata: formMeta,
@@ -484,8 +334,6 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
     try {
       const schema = { metadata: formMeta, elements, pages };
       localStorage.setItem(DRAFT_KEY, JSON.stringify(schema));
-      // lightweight feedback
-      // Using alert for simplicity in this environment
       alert('Draft saved locally');
     } catch (e) {
       console.error('Failed to save draft', e);
@@ -502,13 +350,7 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
       }
       const imported = JSON.parse(raw);
       if (imported.metadata && imported.elements) {
-        setFormMeta(imported.metadata);
-        setElements(imported.elements);
-        if (imported.pages && Array.isArray(imported.pages) && imported.pages.length > 0) {
-          setPages(imported.pages);
-          setCurrentPageId(imported.pages[0].id);
-        }
-        setSelectedId(null);
+        setAll(imported.elements, imported.pages || [{ id: 'page_1', label: 'Page 1' }], imported.metadata);
         alert('Draft loaded');
       } else {
         alert('Invalid draft format');
@@ -524,21 +366,6 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
     alert('Draft cleared');
   };
 
-  // Autosave: debounce changes to elements/pages/meta
-  React.useEffect(() => {
-    if (!autosaveEnabled) return;
-    const t = setTimeout(() => {
-      try {
-        const schema = { metadata: formMeta, elements, pages };
-        localStorage.setItem(DRAFT_KEY, JSON.stringify(schema));
-        console.debug('Autosaved draft');
-      } catch (e) {
-        console.error('Autosave failed', e);
-      }
-    }, 1200);
-    return () => clearTimeout(t);
-  }, [formMeta, elements, pages, autosaveEnabled]);
-
   const triggerImport = () => {
     fileInputRef.current?.click();
   };
@@ -552,17 +379,11 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
       try {
         const imported = JSON.parse(event.target?.result as string);
         if (imported.metadata && imported.elements) {
-          setFormMeta(imported.metadata);
-          setElements(imported.elements);
-          if (imported.pages && Array.isArray(imported.pages) && imported.pages.length > 0) {
-            setPages(imported.pages);
-            setCurrentPageId(imported.pages[0].id);
-          } else {
-            const defaultPages = [{ id: 'page_1', label: 'Page 1' }];
-            setPages(defaultPages);
-            setCurrentPageId(defaultPages[0].id);
-          }
-          setSelectedId(null);
+          const newPages = (imported.pages && Array.isArray(imported.pages) && imported.pages.length > 0)
+            ? imported.pages
+            : [{ id: 'page_1', label: 'Page 1' }];
+          
+          setAll(imported.elements, newPages, imported.metadata);
           alert('Form schema imported successfully');
         } else {
           alert('Invalid schema file format');
@@ -572,7 +393,6 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
       }
     };
     reader.readAsText(file);
-    // Reset input
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -591,7 +411,6 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
           return;
         }
 
-        // Parse CSV (simple parser, doesn't handle quotes)
         const headers = lines[0].split(',').map(h => h.trim());
         const data = lines.slice(1).map(line => {
           const values = line.split(',').map(v => v.trim());
@@ -602,7 +421,6 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
           return row;
         });
 
-        // Create form elements from headers
         const newElements: FormElement[] = headers.map((header, idx) => ({
           id: `imported_${header.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${Date.now()}_${idx}`,
           type: 'text' as ElementType,
@@ -622,7 +440,6 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
       }
     };
     reader.readAsText(file);
-    // Reset input
     if (csvInputRef.current) csvInputRef.current.value = '';
   };
 
@@ -637,7 +454,6 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
     [elements, currentPageId]
   );
   
-  // Filter elements by signer view (if selected)
   const filteredPageElements = useMemo(
     () => viewAsSignerId
       ? pageElements.filter(el => !el.signerId || el.signerId === viewAsSignerId)
@@ -645,7 +461,6 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
     [pageElements, viewAsSignerId]
   );
   
-  // Get current viewing signer info
   const viewingSigner = useMemo(
     () => viewAsSignerId ? signers.find(s => s.id === viewAsSignerId) : null,
     [viewAsSignerId, signers]
@@ -770,6 +585,22 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
           </button>
 
           <button
+            onClick={() => setIsPreview(!isPreview)}
+            className={`hidden md:flex items-center gap-2 px-3 py-1.5 text-sm font-medium border rounded-md transition-all shadow-sm ${
+              isPreview
+                ? 'text-emerald-600 bg-emerald-50 border-emerald-200 hover:bg-emerald-100'
+                : 'text-slate-600 bg-white border-slate-300 hover:bg-slate-50 hover:text-emerald-600'
+            }`}
+            title={isPreview ? "Exit Preview Mode" : "Preview Form"}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+              <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+            <span>{isPreview ? 'Exit Preview' : 'Preview'}</span>
+          </button>
+
+          <button
             onClick={exportSchema}
             className="hidden md:flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded-md hover:bg-slate-50 hover:text-indigo-600 transition-all shadow-sm"
             title="Export Form Schema"
@@ -799,337 +630,349 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
           <div className="hidden md:flex items-center gap-2">
             <button
               onClick={undo}
-              aria-label="Undo (Ctrl+Z)"
-              disabled={historyPast.length === 0}
-              title={historyPast.length === 0 ? 'Nothing to undo' : 'Undo (Ctrl+Z)'}
-              className={`px-2 py-1 rounded-md text-sm font-medium transition-all ${historyPast.length === 0 ? 'text-slate-300 bg-white' : 'text-slate-600 bg-white hover:bg-slate-50'}`}
+              disabled={!canUndo}
+              className={`p-2 rounded-lg transition-colors ${!canUndo ? 'text-slate-300 cursor-not-allowed' : 'text-slate-600 hover:bg-slate-100 hover:text-indigo-600'}`}
+              title="Undo (Ctrl+Z)"
             >
-              ↺
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+              </svg>
             </button>
             <button
               onClick={redo}
-              aria-label="Redo (Ctrl+Y)"
-              disabled={historyFuture.length === 0}
-              title={historyFuture.length === 0 ? 'Nothing to redo' : 'Redo (Ctrl+Y)'}
-              className={`px-2 py-1 rounded-md text-sm font-medium transition-all ${historyFuture.length === 0 ? 'text-slate-300 bg-white' : 'text-slate-600 bg-white hover:bg-slate-50'}`}
+              disabled={!canRedo}
+              className={`p-2 rounded-lg transition-colors ${!canRedo ? 'text-slate-300 cursor-not-allowed' : 'text-slate-600 hover:bg-slate-100 hover:text-indigo-600'}`}
+              title="Redo (Ctrl+Y)"
             >
-              ↻
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10h-10a8 8 0 00-8 8v2M21 10l-6 6m6-6l-6-6" />
+              </svg>
             </button>
           </div>
 
-          <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200">
-            <button
-              onClick={() => setIsPreview(false)}
-              className={`px-3 md:px-4 py-1.5 rounded-md text-sm font-medium transition-all ${!isPreview ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-              Editor
-            </button>
-            <button
-              onClick={() => setIsPreview(true)}
-              className={`px-3 md:px-4 py-1.5 rounded-md text-sm font-medium transition-all ${isPreview ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-            >
-              Preview
-            </button>
-          </div>
-          {/* Page Controls */}
-          <div className="ml-4 flex items-center gap-2">
-            <label className="sr-only" htmlFor="page-select">Page</label>
-            <select id="page-select" aria-label="Select page" value={currentPageId} onChange={(e) => setCurrentPageId(e.target.value)} className="px-2 py-1 border border-slate-200 rounded bg-white text-sm">
-              {pages.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
-            </select>
-            <button onClick={() => {
-              const id = `page_${Date.now()}`;
-              const newPages = [...pages, { id, label: `Page ${pages.length + 1}` }];
-              setPages(newPages);
-              setCurrentPageId(id);
-            }} className="px-2 py-1 text-sm bg-indigo-50 text-indigo-600 rounded">+ Page</button>
-            {pages.length > 1 && (
-              <>
-                <button 
-                  onClick={() => setShowSkipLogicBuilder(currentPageId)}
-                  className="px-2 py-1 text-sm bg-cyan-50 text-cyan-600 rounded flex items-center gap-1"
-                  title="Configure skip logic for this page"
-                >
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-                  </svg>
-                  Skip
-                </button>
-                <button onClick={() => {
-                  // remove current page: move elements to previous page if any
-                  const idx = pages.findIndex(p => p.id === currentPageId);
-                  const prev = idx > 0 ? pages[idx - 1].id : pages[0].id;
-                  setElements(elements.map(el => el.pageId === currentPageId ? { ...el, pageId: prev } : el));
-                  const newPages = pages.filter(p => p.id !== currentPageId);
-                  setPages(newPages);
-                  setCurrentPageId(prev);
-                }} className="px-2 py-1 text-sm bg-red-50 text-red-600 rounded">Remove</button>
-              </>
-            )}
-          </div>
-          
-          {/* Signer View Selector */}
-          {signers.length > 0 && signerMode !== 'single' && (
-            <div className="ml-4 flex items-center gap-2 pl-4 border-l border-slate-200">
-              <span className="text-xs text-slate-500">มุมมอง:</span>
-              <select
-                value={viewAsSignerId || ''}
-                onChange={(e) => setViewAsSignerId(e.target.value || null)}
-                className={`px-2 py-1 border rounded text-sm ${
-                  viewAsSignerId 
-                    ? 'border-amber-300 bg-amber-50 text-amber-700' 
-                    : 'border-slate-200 bg-white text-slate-700'
-                }`}
-              >
-                <option value="">👁️ ทุกคน (Admin)</option>
-                {signers.map(s => (
-                  <option key={s.id} value={s.id}>
-                    ✍️ {s.order}. {s.name}
-                  </option>
-                ))}
-              </select>
-              {viewAsSignerId && viewingSigner && (
-                <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
-                  กำลังดูในมุมมอง: {viewingSigner.name}
-                </span>
-              )}
-            </div>
-          )}
+          <button
+            onClick={() => onSave({ name: formName, metadata: formMeta, elements, pages, signers, signerMode })}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg hover:from-indigo-700 hover:to-purple-700 transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+            </svg>
+            <span>Save</span>
+          </button>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 flex overflow-hidden relative">
-        {isPreview ? (
-          <div className="flex-1 bg-slate-100 overflow-y-auto w-full scroll-smooth">
-            <div className="min-h-full w-full p-4 md:p-8 flex justify-center items-start pb-24">
-              <Preview 
-                elements={elements} 
-                meta={formMeta} 
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left Sidebar: Toolbox */}
+        <Toolbox onAdd={addElement} />
+
+        {/* Center: Canvas */}
+        <div className="flex-1 flex flex-col relative overflow-hidden bg-slate-100">
+          {/* Signer View Toggle (if multi-signer) */}
+          {signers.length > 0 && (
+            <div className="absolute top-4 left-4 z-10 bg-white/90 backdrop-blur p-2 rounded-lg shadow-sm border border-slate-200 flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-600 uppercase">View as:</span>
+              <select 
+                value={viewAsSignerId || ''} 
+                onChange={(e) => setViewAsSignerId(e.target.value || null)}
+                className="text-xs border-none bg-transparent font-semibold text-indigo-600 focus:ring-0 cursor-pointer"
+              >
+                <option value="">-- All Fields --</option>
+                {signers.map(s => (
+                  <option key={s.id} value={s.id}>{s.name} ({s.role})</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Page Tabs */}
+          {pages.length > 1 && (
+            <div className="bg-white border-b border-slate-200 px-4 flex items-center gap-2 overflow-x-auto">
+              {pages.map((page, idx) => (
+                <button
+                  key={page.id}
+                  onClick={() => setCurrentPageId(page.id)}
+                  className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                    currentPageId === page.id
+                      ? 'border-indigo-600 text-indigo-600'
+                      : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                  }`}
+                >
+                  {page.label || `Page ${idx + 1}`}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className="flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar" onClick={() => setSelectedId(null)}>
+            <div className="max-w-3xl mx-auto bg-white min-h-[800px] shadow-xl rounded-xl overflow-hidden border border-slate-200 transition-all">
+              <Canvas
+                elements={filteredPageElements}
+                meta={formMeta}
                 currentLanguage={currentLanguage}
-                onLanguageChange={setCurrentLanguage}
+                selectedId={selectedId}
+                signers={signers}
+                viewAsSignerId={viewAsSignerId}
+                onSelect={(id) => {
+                  setSelectedId(id);
+                }}
+                onMove={moveElement}
+                onDelete={deleteElement}
+                onDuplicate={duplicateElement}
+                onReparent={reparentElement}
+                onUpdateMeta={setFormMeta}
+                onAdd={addElement}
               />
             </div>
+            
+            {/* Footer Credits */}
+            <div className="max-w-3xl mx-auto mt-8 text-center text-slate-400 text-xs pb-8">
+              <p>FormFlow Builder &copy; {new Date().getFullYear()} &bull; Designed for performance</p>
+            </div>
           </div>
-        ) : (
-          <>
-            <Toolbox onAdd={addElement} />
-            <Canvas 
-              elements={filteredPageElements} 
-              meta={formMeta}
-              currentLanguage={currentLanguage}
-              selectedId={selectedId} 
-              signers={signers}
-              viewAsSignerId={viewAsSignerId}
-              onSelect={setSelectedId} 
-              onMove={moveElement}
-              onDelete={deleteElement}
-              onDuplicate={duplicateElement}
-              onReparent={reparentElement}
-              onUpdateMeta={setFormMeta}
-              onAdd={addElement}
-            />
-            <PropertiesPanel 
-              element={selectedElement} 
-              allElements={elements}
-              formMetadata={formMeta}
-              currentLanguage={currentLanguage}
-              signers={signers}
-              onLanguageChange={setCurrentLanguage}
-              onUpdate={updateElement} 
-              onDelete={deleteElement}
-              onUpdateMetadata={setFormMeta}
-              onRequestLabelChange={requestLabelChange}
-              onOpenCalculation={() => setShowCalculationBuilder(true)}
-            />
-          </>
-        )}
-      </main>
+        </div>
 
-      {/* Code View Modal */}
+        {/* Right Sidebar: Properties */}
+        <PropertiesPanel
+          element={selectedElement}
+          allElements={elements}
+          formMetadata={formMeta}
+          currentLanguage={currentLanguage}
+          signers={signers}
+          onLanguageChange={setCurrentLanguage}
+          onUpdate={updateElement}
+          onDelete={deleteElement}
+          onUpdateMetadata={setFormMeta}
+          onRequestLabelChange={requestLabelChange}
+          onOpenCalculation={() => setShowCalculationBuilder(true)}
+        />
+      </div>
+
+      {/* Modals */}
+      {isPreview && (
+        <Preview
+          elements={elements}
+          pages={pages}
+          meta={formMeta}
+          currentLanguage={currentLanguage}
+          onLanguageChange={setCurrentLanguage}
+          onClose={() => setIsPreview(false)}
+        />
+      )}
+
       {showCodeModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowCodeModal(false)}>
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
-            <div className="p-4 border-b border-slate-200 flex justify-between items-center">
-              <h3 className="font-semibold text-slate-800">Form Schema (JSON)</h3>
-              <button onClick={() => setShowCodeModal(false)} className="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+            <div className="p-4 border-b flex justify-between items-center bg-slate-50 rounded-t-xl">
+              <h3 className="font-bold text-lg text-slate-800">Form JSON Schema</h3>
+              <button onClick={() => setShowCodeModal(false)} className="text-slate-500 hover:text-slate-700">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
-            <div className="flex-1 overflow-auto p-4 bg-slate-50 font-mono text-xs">
-              <pre>{JSON.stringify({ metadata: formMeta, elements }, null, 2)}</pre>
+            <div className="flex-1 overflow-auto p-4 bg-slate-900 text-slate-100 font-mono text-sm">
+              <pre>{JSON.stringify({ metadata: formMeta, elements, pages, signers, signerMode }, null, 2)}</pre>
             </div>
-            <div className="p-4 border-t border-slate-200 flex justify-end gap-2">
-              <button 
+            <div className="p-4 border-t bg-slate-50 rounded-b-xl flex justify-end gap-2">
+              <button
                 onClick={() => {
-                  navigator.clipboard.writeText(JSON.stringify({ metadata: formMeta, elements }, null, 2));
+                  navigator.clipboard.writeText(JSON.stringify({ metadata: formMeta, elements, pages, signers, signerMode }, null, 2));
                   alert('Copied to clipboard!');
                 }}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium"
+                className="px-4 py-2 bg-white border border-slate-300 rounded-lg text-slate-700 font-medium hover:bg-slate-50 transition-colors"
               >
-                Copy to Clipboard
+                Copy JSON
+              </button>
+              <button
+                onClick={() => setShowCodeModal(false)}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors"
+              >
+                Close
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Form Settings Modal */}
-      {showSettingsModal && onSaveSettings && (
+      {showSettingsModal && (
         <FormSettingsModal
-          form={form}
+          form={{
+            ...form,
+            name: formName,
+            metadata: formMeta,
+            signers: signers,
+            signerMode: signerMode
+          }}
           elements={elements}
+          onClose={() => setShowSettingsModal(false)}
           onSave={(settings) => {
-            onSaveSettings(settings);
             setFormName(settings.name);
+            if (settings.description) {
+               // Update metadata description if provided
+               const currentDesc = typeof formMeta.description === 'string' 
+                 ? { th: formMeta.description, en: formMeta.description }
+                 : formMeta.description || { th: '', en: '' };
+               
+               setFormMeta({ 
+                 ...formMeta, 
+                 description: { 
+                   ...currentDesc, 
+                   [currentLanguage]: settings.description 
+                 } 
+               });
+            }
             if (settings.signers) setSigners(settings.signers);
             if (settings.signerMode) setSignerMode(settings.signerMode);
+            
+            // Call parent save settings
+            onSaveSettings?.({
+              name: settings.name,
+              description: settings.description,
+              signers: settings.signers,
+              signerMode: settings.signerMode
+            });
+            setShowSettingsModal(false);
           }}
-          onClose={() => setShowSettingsModal(false)}
         />
       )}
 
-      {/* Import Modal */}
       {showImportModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowImportModal(false)}>
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
-            <div className="p-4 border-b border-slate-200 flex justify-between items-center">
-              <h3 className="font-semibold text-slate-800">Import Data</h3>
-              <button onClick={() => setShowImportModal(false)} className="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
-            </div>
-            <div className="p-6 space-y-4">
-              <div className="space-y-3">
-                <button
-                  onClick={() => {
-                    fileInputRef.current?.click();
-                    setShowImportModal(false);
-                  }}
-                  className="w-full p-4 bg-indigo-50 border-2 border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors text-left"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-indigo-600 rounded-lg flex items-center justify-center text-white text-xl">
-                      📄
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-slate-800">Import JSON Schema</h4>
-                      <p className="text-xs text-slate-500">Import complete form structure (metadata, elements, pages)</p>
-                    </div>
-                  </div>
-                </button>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 space-y-4">
+            <h3 className="font-bold text-xl text-slate-800">Import Data</h3>
+            <p className="text-sm text-slate-600">Choose a file format to import. This will replace current form content.</p>
+            
+            <div className="grid grid-cols-1 gap-3">
+              <button
+                onClick={() => { setShowImportModal(false); triggerImport(); }}
+                className="flex items-center gap-3 p-4 border-2 border-slate-200 rounded-xl hover:border-indigo-500 hover:bg-indigo-50 transition-all group"
+              >
+                <div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg group-hover:bg-indigo-200">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
+                  </svg>
+                </div>
+                <div className="text-left">
+                  <div className="font-bold text-slate-800">Import JSON Schema</div>
+                  <div className="text-xs text-slate-500">Restore from a previously exported file</div>
+                </div>
+              </button>
 
+              <button
+                onClick={() => { setShowImportModal(false); csvInputRef.current?.click(); }}
+                className="flex items-center gap-3 p-4 border-2 border-slate-200 rounded-xl hover:border-green-500 hover:bg-green-50 transition-all group"
+              >
+                <div className="p-2 bg-green-100 text-green-600 rounded-lg group-hover:bg-green-200">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <div className="text-left">
+                  <div className="font-bold text-slate-800">Import from CSV</div>
+                  <div className="text-xs text-slate-500">Generate fields from CSV headers</div>
+                </div>
+              </button>
+
+              <div className="pt-2 border-t border-slate-100">
                 <button
-                  onClick={() => {
-                    csvInputRef.current?.click();
-                    setShowImportModal(false);
-                  }}
-                  className="w-full p-4 bg-green-50 border-2 border-green-200 rounded-lg hover:bg-green-100 transition-colors text-left"
+                  onClick={() => { setShowImportModal(false); loadDraft(); }}
+                  className="w-full flex items-center justify-center gap-2 p-3 text-sm font-medium text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-green-600 rounded-lg flex items-center justify-center text-white text-xl">
-                      📊
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-slate-800">Import CSV Fields</h4>
-                      <p className="text-xs text-slate-500">Create form fields from CSV column headers</p>
-                    </div>
-                  </div>
+                  <span>Load Saved Draft</span>
                 </button>
               </div>
-
-              <div className="pt-3 border-t border-slate-200">
-                <p className="text-xs text-slate-500">
-                  <strong>JSON:</strong> Replaces entire form structure<br/>
-                  <strong>CSV:</strong> Adds new fields from column headers
-                </p>
-              </div>
             </div>
+
+            <button
+              onClick={() => setShowImportModal(false)}
+              className="w-full py-2 text-sm font-medium text-slate-500 hover:text-slate-700"
+            >
+              Cancel
+            </button>
           </div>
         </div>
       )}
 
-      {/* Calculation Builder Modal */}
       {showCalculationBuilder && selectedElement && selectedElement.type === 'number' && (
         <CalculationBuilder
           element={selectedElement}
           allElements={elements}
-          currentLanguage={currentLanguage}
-          onSave={(calculation) => {
-            updateElement({ ...selectedElement, calculation });
+          onSave={(calc) => {
+            updateElement({ ...selectedElement, calculation: calc });
             setShowCalculationBuilder(false);
           }}
           onClose={() => setShowCalculationBuilder(false)}
         />
       )}
 
-      {/* Skip Logic Builder Modal */}
       {showSkipLogicBuilder && (
         <SkipLogicBuilder
-          page={pages.find(p => p.id === showSkipLogicBuilder) as FormPage}
-          allPages={pages as FormPage[]}
-          allElements={elements}
-          currentLanguage={currentLanguage}
-          onSave={(skipRules) => {
-            setPages(pages.map(p => 
-              p.id === showSkipLogicBuilder 
-                ? { ...p, skipRules } 
-                : p
-            ));
+          pageId={showSkipLogicBuilder}
+          pages={pages}
+          elements={elements}
+          onSave={(updatedPages) => {
+            setPages(updatedPages);
             setShowSkipLogicBuilder(null);
           }}
           onClose={() => setShowSkipLogicBuilder(null)}
         />
       )}
 
-      {/* Template Manager Modal */}
       {showTemplateManager && (
         <TemplateManager
           currentMetadata={formMeta}
           currentLanguage={currentLanguage}
           currentElements={elements}
           currentPages={pages}
-          onApplyHeader={(headerStyle) => {
-            if (headerStyle) {
-              setFormMeta({
-                ...formMeta,
-                headerBackgroundColor: headerStyle.backgroundColor,
-                headerTitleColor: headerStyle.textColor,
-                headerTextAlignment: headerStyle.textAlignment,
-                logoUrl: headerStyle.logoUrl || formMeta.logoUrl,
-                logoPlacement: headerStyle.logoPlacement || formMeta.logoPlacement,
-                logoAlignment: headerStyle.logoAlignment || formMeta.logoAlignment,
-                logoWidth: headerStyle.logoWidth || formMeta.logoWidth,
-              });
-            }
+          onApplyHeader={(style) => {
+            console.log('onApplyHeader called with style:', style);
+            if (!style) return;
+            setFormMeta({
+              ...formMeta,
+              headerBackgroundColor: style.backgroundColor,
+              headerTitleColor: style.textColor,
+              headerTextAlignment: style.textAlignment,
+              logoPlacement: style.logoPlacement,
+              logoAlignment: style.logoAlignment,
+              logoWidth: style.logoWidth,
+              // Only update content if present in template
+              title: style.title || formMeta.title,
+              description: style.description || formMeta.description
+            });
+            console.log('Header template applied, closing modal');
             setShowTemplateManager(false);
           }}
-          onApplyFooter={(footerStyle) => {
-            if (footerStyle) {
-              setFormMeta({
-                ...formMeta,
-                footerBackgroundColor: footerStyle.backgroundColor,
-                footerTextColor: footerStyle.textColor,
-                footerText: footerStyle.footerText || formMeta.footerText,
-              });
-            }
+          onApplyFooter={(style) => {
+            if (!style) return;
+            setFormMeta({
+              ...formMeta,
+              footerBackgroundColor: style.backgroundColor,
+              footerTextColor: style.textColor,
+              footerText: style.footerText || formMeta.footerText
+            });
             setShowTemplateManager(false);
           }}
           onApplyBody={(newElements, mode) => {
-            // Ensure all elements have the current page ID
+            console.log('onApplyBody called:', { mode, newElements, currentElements: elements });
+            
+            // Add pageId to all elements so they show on the current page
             const elementsWithPageId = newElements.map(el => ({
               ...el,
-              pageId: el.pageId || currentPageId,
+              pageId: currentPageId
             }));
             
             if (mode === 'replace') {
-              // Replace all elements with template elements
               setElements(elementsWithPageId);
+              setSelectedId(null);
             } else {
-              // Append template elements to existing elements
               setElements([...elements, ...elementsWithPageId]);
             }
+            console.log('Body template applied with pageId, closing modal');
             setShowTemplateManager(false);
           }}
-          onSaveAsTemplate={(name, category) => {
-            // Handled internally by TemplateManager
-          }}
+          onSaveAsTemplate={() => {}}
           onClose={() => setShowTemplateManager(false)}
         />
       )}
