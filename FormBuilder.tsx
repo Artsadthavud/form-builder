@@ -993,6 +993,8 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
         <TemplateManager
           currentMetadata={formMeta}
           currentLanguage={currentLanguage}
+          currentElements={elements}
+          currentPages={pages}
           onApplyHeader={(headerStyle) => {
             if (headerStyle) {
               setFormMeta({
@@ -1016,6 +1018,16 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
                 footerTextColor: footerStyle.textColor,
                 footerText: footerStyle.footerText || formMeta.footerText,
               });
+            }
+            setShowTemplateManager(false);
+          }}
+          onApplyBody={(newElements, mode) => {
+            if (mode === 'replace') {
+              // Replace all elements with template elements
+              setElements(newElements);
+            } else {
+              // Append template elements to existing elements
+              setElements([...elements, ...newElements]);
             }
             setShowTemplateManager(false);
           }}
