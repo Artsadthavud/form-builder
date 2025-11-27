@@ -1,6 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FormElement, FormMetadata, Language, FormResponse } from '../types';
+import { FormElement, FormMetadata, Language, FormResponse, FormPage } from '../types';
 import { getText, isTranslatable } from '../utils/i18n';
+import { 
+  isElementVisible, 
+  evaluateSkipRules, 
+  calculateValue, 
+  formatCalculatedValue,
+  resolvePiping 
+} from '../utils/advancedLogic';
 
 interface PublicFormProps {
   formId: string;
@@ -123,9 +130,11 @@ const PublicForm: React.FC<PublicFormProps> = ({ formId, onSubmit, onBack }) => 
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [currentLanguage, setCurrentLanguage] = useState<Language>('th');
   const [startTime] = useState(new Date());
+  const [currentPageIndex, setCurrentPageIndex] = useState(0);
 
   // Load form from localStorage
   const [elements, setElements] = useState<FormElement[]>([]);
+  const [pages, setPages] = useState<FormPage[]>([{ id: 'page_1', label: 'Page 1' }]);
   const [meta, setMeta] = useState<FormMetadata>({
     title: 'Form',
     description: '',
@@ -140,6 +149,7 @@ const PublicForm: React.FC<PublicFormProps> = ({ formId, onSubmit, onBack }) => 
       const form = forms.find((f: any) => f.id === formId);
       if (form) {
         setElements(form.elements || []);
+        setPages(form.pages || [{ id: 'page_1', label: 'Page 1' }]);
         setMeta(form.metadata || meta);
         setCurrentLanguage(form.metadata?.defaultLanguage || 'th');
       }
@@ -147,35 +157,72 @@ const PublicForm: React.FC<PublicFormProps> = ({ formId, onSubmit, onBack }) => 
   }, [formId]);
 
   // Check if element should be visible based on conditional logic
-  const isElementVisible = (element: FormElement): boolean => {
-    if (!element.logic || element.logic.conditions.length === 0) return true;
+  const checkElementVisible = (element: FormElement): boolean => {
+    return isElementVisible(element, formData);
+  };
+
+  // Handle auto-calculation for number fields
+  useEffect(() => {
+    let hasChanges = false;
+    const newFormData = { ...formData };
     
-    const { combinator, conditions } = element.logic;
-    const results = conditions.map(condition => {
-      const targetValue = formData[condition.targetId];
-      const conditionValue = condition.value;
-      
-      switch (condition.operator) {
-        case 'equals':
-          return String(targetValue) === String(conditionValue);
-        case 'not_equals':
-          return String(targetValue) !== String(conditionValue);
-        case 'contains':
-          return String(targetValue || '').includes(String(conditionValue));
-        case 'not_contains':
-          return !String(targetValue || '').includes(String(conditionValue));
-        default:
-          return true;
+    elements.forEach(element => {
+      if (element.calculation?.enabled && element.calculation.formula.length > 0) {
+        const calculatedValue = calculateValue(element.calculation, formData);
+        if (newFormData[element.id] !== calculatedValue) {
+          newFormData[element.id] = calculatedValue;
+          hasChanges = true;
+        }
       }
     });
+    
+    if (hasChanges) {
+      setFormData(newFormData);
+    }
+  }, [formData, elements]);
 
-    return combinator === 'AND' ? results.every(r => r) : results.some(r => r);
+  // Get text with piping resolved
+  const getTextWithPiping = (text: string | { th: string; en: string }): string => {
+    const rawText = getText(text, currentLanguage);
+    return resolvePiping(rawText, formData, elements);
   };
+
+  // Handle next page with skip logic
+  const handleNextPage = () => {
+    const currentPage = pages[currentPageIndex];
+    const allPageIds = pages.map(p => p.id);
+    
+    // Check skip rules
+    const skipToPageId = evaluateSkipRules(currentPage.skipRules, formData, allPageIds);
+    
+    if (skipToPageId) {
+      const skipToIndex = pages.findIndex(p => p.id === skipToPageId);
+      if (skipToIndex > currentPageIndex) {
+        setCurrentPageIndex(skipToIndex);
+        return;
+      }
+    }
+    
+    // Normal next page
+    if (currentPageIndex < pages.length - 1) {
+      setCurrentPageIndex(currentPageIndex + 1);
+    }
+  };
+
+  const handlePrevPage = () => {
+    if (currentPageIndex > 0) {
+      setCurrentPageIndex(currentPageIndex - 1);
+    }
+  };
+
+  const currentPage = pages[currentPageIndex];
+  const isLastPage = currentPageIndex === pages.length - 1;
+  const isFirstPage = currentPageIndex === 0;
 
   // Validate single field
   const validateField = (element: FormElement, value: any): string | null => {
     // Check if field is visible
-    if (!isElementVisible(element)) return null;
+    if (!checkElementVisible(element)) return null;
 
     const label = getText(element.label, currentLanguage);
 
@@ -328,7 +375,7 @@ const PublicForm: React.FC<PublicFormProps> = ({ formId, onSubmit, onBack }) => 
   };
 
   // Calculate progress
-  const requiredFields = elements.filter(el => el.required && el.type !== 'section' && isElementVisible(el));
+  const requiredFields = elements.filter(el => el.required && el.type !== 'section' && checkElementVisible(el));
   const filledRequired = requiredFields.filter(el => {
     const value = formData[el.id];
     return value !== undefined && value !== null && value !== '' && 
@@ -340,7 +387,7 @@ const PublicForm: React.FC<PublicFormProps> = ({ formId, onSubmit, onBack }) => 
 
   // Render field based on type
   const renderField = (element: FormElement) => {
-    if (!isElementVisible(element)) return null;
+    if (!checkElementVisible(element)) return null;
 
     const label = getText(element.label, currentLanguage);
     const placeholder = element.placeholder ? getText(element.placeholder, currentLanguage) : '';

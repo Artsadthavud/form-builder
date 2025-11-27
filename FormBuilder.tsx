@@ -1,11 +1,13 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { FormElement, ElementType, FormMetadata, FormProject, Language } from './types';
+import { FormElement, ElementType, FormMetadata, FormProject, Language, FormPage, Calculation, SkipRule } from './types';
 import Toolbox from './components/Toolbox';
 import Canvas from './components/Canvas';
 import PropertiesPanel from './components/PropertiesPanel';
 import Preview from './components/Preview';
 import FormSettingsModal from './components/FormSettingsModal';
+import CalculationBuilder from './components/CalculationBuilder';
+import SkipLogicBuilder from './components/SkipLogicBuilder';
 
 interface FormBuilderProps {
   form: FormProject;
@@ -31,6 +33,8 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
   const [showCodeModal, setShowCodeModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showCalculationBuilder, setShowCalculationBuilder] = useState(false);
+  const [showSkipLogicBuilder, setShowSkipLogicBuilder] = useState<string | null>(null); // page id
   const fileInputRef = useRef<HTMLInputElement>(null);
   const csvInputRef = useRef<HTMLInputElement>(null);
 
@@ -769,15 +773,27 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
               setCurrentPageId(id);
             }} className="px-2 py-1 text-sm bg-indigo-50 text-indigo-600 rounded">+ Page</button>
             {pages.length > 1 && (
-              <button onClick={() => {
-                // remove current page: move elements to previous page if any
-                const idx = pages.findIndex(p => p.id === currentPageId);
-                const prev = idx > 0 ? pages[idx - 1].id : pages[0].id;
-                setElements(elements.map(el => el.pageId === currentPageId ? { ...el, pageId: prev } : el));
-                const newPages = pages.filter(p => p.id !== currentPageId);
-                setPages(newPages);
-                setCurrentPageId(prev);
-              }} className="px-2 py-1 text-sm bg-red-50 text-red-600 rounded">Remove</button>
+              <>
+                <button 
+                  onClick={() => setShowSkipLogicBuilder(currentPageId)}
+                  className="px-2 py-1 text-sm bg-cyan-50 text-cyan-600 rounded flex items-center gap-1"
+                  title="Configure skip logic for this page"
+                >
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                  </svg>
+                  Skip
+                </button>
+                <button onClick={() => {
+                  // remove current page: move elements to previous page if any
+                  const idx = pages.findIndex(p => p.id === currentPageId);
+                  const prev = idx > 0 ? pages[idx - 1].id : pages[0].id;
+                  setElements(elements.map(el => el.pageId === currentPageId ? { ...el, pageId: prev } : el));
+                  const newPages = pages.filter(p => p.id !== currentPageId);
+                  setPages(newPages);
+                  setCurrentPageId(prev);
+                }} className="px-2 py-1 text-sm bg-red-50 text-red-600 rounded">Remove</button>
+              </>
             )}
           </div>
         </div>
@@ -822,6 +838,7 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
               onDelete={deleteElement}
               onUpdateMetadata={setFormMeta}
               onRequestLabelChange={requestLabelChange}
+              onOpenCalculation={() => setShowCalculationBuilder(true)}
             />
           </>
         )}
@@ -921,6 +938,39 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
             </div>
           </div>
         </div>
+      )}
+
+      {/* Calculation Builder Modal */}
+      {showCalculationBuilder && selectedElement && selectedElement.type === 'number' && (
+        <CalculationBuilder
+          element={selectedElement}
+          allElements={elements}
+          currentLanguage={currentLanguage}
+          onSave={(calculation) => {
+            updateElement({ ...selectedElement, calculation });
+            setShowCalculationBuilder(false);
+          }}
+          onClose={() => setShowCalculationBuilder(false)}
+        />
+      )}
+
+      {/* Skip Logic Builder Modal */}
+      {showSkipLogicBuilder && (
+        <SkipLogicBuilder
+          page={pages.find(p => p.id === showSkipLogicBuilder) as FormPage}
+          allPages={pages as FormPage[]}
+          allElements={elements}
+          currentLanguage={currentLanguage}
+          onSave={(skipRules) => {
+            setPages(pages.map(p => 
+              p.id === showSkipLogicBuilder 
+                ? { ...p, skipRules } 
+                : p
+            ));
+            setShowSkipLogicBuilder(null);
+          }}
+          onClose={() => setShowSkipLogicBuilder(null)}
+        />
       )}
     </div>
   );

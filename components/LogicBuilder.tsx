@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { FormElement, Logic, Condition, ConditionOperator } from '../types';
 import { getText } from '../utils/i18n';
+import { operatorLabels as allOperatorLabels, getOperatorsForType } from '../utils/advancedLogic';
 
 interface LogicBuilderProps {
   element: FormElement;
@@ -13,11 +14,12 @@ interface LogicBuilderProps {
 const LogicBuilder: React.FC<LogicBuilderProps> = ({ element, allElements, currentLanguage, onSave, onClose }) => {
   const [logic, setLogic] = useState<Logic>(element.logic || {
     combinator: 'AND',
-    conditions: []
+    conditions: [],
+    action: 'show'
   });
 
   const [action, setAction] = useState<'show' | 'hide'>(
-    element.logic && element.logic.conditions.length > 0 ? 'show' : 'show'
+    element.logic?.action || 'show'
   );
 
   // Get elements that can be used as conditions (before current element)
@@ -27,12 +29,9 @@ const LogicBuilder: React.FC<LogicBuilderProps> = ({ element, allElements, curre
     el.type !== 'paragraph'
   );
 
-  const operatorLabels: Record<ConditionOperator, string> = {
-    equals: 'เท่ากับ (equals)',
-    not_equals: 'ไม่เท่ากับ (not equals)',
-    contains: 'มีคำว่า (contains)',
-    not_contains: 'ไม่มีคำว่า (not contains)'
-  };
+  const operatorLabels: Record<ConditionOperator, string> = Object.fromEntries(
+    Object.entries(allOperatorLabels).map(([k, v]) => [k, `${v.th} (${v.en})`])
+  ) as Record<ConditionOperator, string>;
 
   const addCondition = () => {
     const newCondition: Condition = {
@@ -62,7 +61,7 @@ const LogicBuilder: React.FC<LogicBuilderProps> = ({ element, allElements, curre
     if (logic.conditions.length === 0) {
       onSave(undefined);
     } else {
-      onSave(logic);
+      onSave({ ...logic, action });
     }
     onClose();
   };
@@ -265,16 +264,17 @@ const LogicBuilder: React.FC<LogicBuilderProps> = ({ element, allElements, curre
                                 <label className="block text-xs font-semibold text-slate-600 mb-1">Operator</label>
                                 <select
                                   value={condition.operator}
-                                  onChange={(e) => updateCondition(index, 'operator', e.target.value)}
+                                  onChange={(e) => updateCondition(index, 'operator', e.target.value as ConditionOperator)}
                                   className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
                                 >
-                                  {Object.entries(operatorLabels).map(([op, label]) => (
-                                    <option key={op} value={op}>{label}</option>
+                                  {getOperatorsForType(targetElement?.type || 'text').map(op => (
+                                    <option key={op} value={op}>{operatorLabels[op]}</option>
                                   ))}
                                 </select>
                               </div>
 
-                              {/* Value */}
+                              {/* Value - hide for is_empty/is_not_empty */}
+                              {!['is_empty', 'is_not_empty'].includes(condition.operator) && (
                               <div>
                                 <label className="block text-xs font-semibold text-slate-600 mb-1">Value</label>
                                 {hasOptions && options.length > 0 ? (
@@ -288,6 +288,14 @@ const LogicBuilder: React.FC<LogicBuilderProps> = ({ element, allElements, curre
                                       <option key={i} value={opt}>{opt}</option>
                                     ))}
                                   </select>
+                                ) : targetElement?.type === 'number' || targetElement?.type === 'rating' ? (
+                                  <input
+                                    type="number"
+                                    value={condition.value}
+                                    onChange={(e) => updateCondition(index, 'value', e.target.value)}
+                                    placeholder="Enter number..."
+                                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                  />
                                 ) : (
                                   <input
                                     type="text"
@@ -298,6 +306,7 @@ const LogicBuilder: React.FC<LogicBuilderProps> = ({ element, allElements, curre
                                   />
                                 )}
                               </div>
+                              )}
                             </div>
 
                             {/* Delete Button */}

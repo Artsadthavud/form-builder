@@ -28,7 +28,12 @@ export interface TokenSource {
   };
 }
 
-export type ConditionOperator = 'equals' | 'not_equals' | 'contains' | 'not_contains';
+export type ConditionOperator = 
+  | 'equals' | 'not_equals' 
+  | 'contains' | 'not_contains'
+  | 'is_empty' | 'is_not_empty'
+  | 'greater_than' | 'less_than' | 'greater_equal' | 'less_equal'
+  | 'starts_with' | 'ends_with';
 
 export interface Condition {
   id: string;
@@ -40,6 +45,44 @@ export interface Condition {
 export interface Logic {
   combinator: 'AND' | 'OR';
   conditions: Condition[];
+  action?: 'show' | 'hide'; // what to do when conditions match
+}
+
+// --- Advanced Logic: Skip Logic ---
+export interface SkipRule {
+  id: string;
+  conditions: Condition[];
+  combinator: 'AND' | 'OR';
+  targetPageId: string; // page to skip to when conditions are met
+}
+
+// --- Advanced Logic: Calculation ---
+export type CalculationOperator = '+' | '-' | '*' | '/' | '%';
+
+export interface CalculationOperand {
+  type: 'field' | 'constant';
+  fieldId?: string;   // when type = 'field'
+  value?: number;     // when type = 'constant'
+}
+
+export interface Calculation {
+  enabled: boolean;
+  formula: CalculationStep[];
+  decimalPlaces?: number;
+  prefix?: string;  // e.g. '฿' or '$'
+  suffix?: string;  // e.g. 'บาท'
+}
+
+export interface CalculationStep {
+  operand: CalculationOperand;
+  operator?: CalculationOperator; // undefined for last operand
+}
+
+// --- Advanced Logic: Piping (Answer Recall) ---
+export interface PipeToken {
+  token: string;      // e.g. "answer:field_123"
+  sourceFieldId: string;
+  fallback?: string;  // fallback text if field has no answer
 }
 
 export interface FormMetadata {
@@ -142,10 +185,24 @@ export interface FormElement {
   
   // For rating
   maxRating?: number;
+
+  // Advanced Logic: Calculation (for number fields)
+  calculation?: Calculation;
+
+  // Advanced Logic: Piping - reference answers from other fields
+  // Used in label/placeholder/content like "Hello {answer:field_123}"
+  pipedFields?: string[]; // list of field IDs referenced via piping
 }
 
 // Form Project Types
 export type FormStatus = 'draft' | 'published' | 'archived';
+
+// Page with optional skip rules
+export interface FormPage {
+  id: string;
+  label: string;
+  skipRules?: SkipRule[]; // Skip to another page based on conditions
+}
 
 export interface FormRevision {
   id: string;
@@ -153,7 +210,7 @@ export interface FormRevision {
   name: string;
   metadata: FormMetadata;
   elements: FormElement[];
-  pages: { id: string; label: string }[];
+  pages: FormPage[];
   createdAt: string;
   createdBy?: string;
   description?: string; // คำอธิบายการเปลี่ยนแปลง
@@ -167,7 +224,7 @@ export interface FormProject {
   status: FormStatus;
   metadata: FormMetadata;
   elements: FormElement[];
-  pages: { id: string; label: string }[];
+  pages: FormPage[];
   createdAt: string;
   updatedAt: string;
   publishedAt?: string;
