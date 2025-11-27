@@ -33,10 +33,9 @@ const CalculationBuilder: React.FC<CalculationBuilderProps> = ({
     suffix: ''
   });
 
-  // Get numeric fields that can be used in calculation (before current element)
-  const currentIndex = allElements.findIndex(el => el.id === element.id);
-  const availableFields = allElements.slice(0, currentIndex).filter(el =>
-    el.type === 'number' || el.type === 'rating'
+  // Get all numeric fields that can be used in calculation (excluding current element)
+  const availableFields = allElements.filter(el =>
+    el.id !== element.id && (el.type === 'number' || el.type === 'rating')
   );
 
   const addStep = (type: 'field' | 'constant') => {
