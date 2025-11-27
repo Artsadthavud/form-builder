@@ -775,12 +775,64 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                       <input type="number" value={element.maxLength || ''} onChange={(e) => handleChange('maxLength', e.target.value ? parseInt(e.target.value) : undefined)} className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm bg-white" />
                     </div>
                   </div>
+                </>
+             )}
+
+             {/* Regex Pattern - for text, email, phone, textarea */}
+             {(element.type === 'text' || element.type === 'textarea' || element.type === 'email' || element.type === 'phone') && (
+                <div className="space-y-2">
                   <div>
                     <label className="block text-xs font-medium text-slate-700 mb-1">Regex Pattern</label>
-                    <input type="text" value={element.pattern || ''} onChange={(e) => handleChange('pattern', e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm font-mono text-xs bg-white" placeholder="e.g. ^[A-Za-z]+$" />
-                    <p className="text-[10px] text-slate-400 mt-1">Regular expression for advanced validation.</p>
+                    <input 
+                      type="text" 
+                      value={element.pattern || ''} 
+                      onChange={(e) => handleChange('pattern', e.target.value)} 
+                      className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm font-mono text-xs bg-white" 
+                      placeholder="e.g. ^[A-Za-z]+$" 
+                    />
                   </div>
-                </>
+                  
+                  {/* Preset Patterns */}
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">Quick Presets</label>
+                    <div className="flex flex-wrap gap-1">
+                      {element.type === 'text' && (
+                        <>
+                          <button type="button" onClick={() => handleChange('pattern', '^[A-Za-z\\s]+$')} className="px-2 py-1 text-[10px] bg-slate-100 hover:bg-slate-200 rounded border border-slate-200 transition-colors">Letters Only</button>
+                          <button type="button" onClick={() => handleChange('pattern', '^[0-9]+$')} className="px-2 py-1 text-[10px] bg-slate-100 hover:bg-slate-200 rounded border border-slate-200 transition-colors">Numbers Only</button>
+                          <button type="button" onClick={() => handleChange('pattern', '^[A-Za-z0-9]+$')} className="px-2 py-1 text-[10px] bg-slate-100 hover:bg-slate-200 rounded border border-slate-200 transition-colors">Alphanumeric</button>
+                          <button type="button" onClick={() => handleChange('pattern', '^[ก-๙\\s]+$')} className="px-2 py-1 text-[10px] bg-slate-100 hover:bg-slate-200 rounded border border-slate-200 transition-colors">Thai Only</button>
+                          <button type="button" onClick={() => handleChange('pattern', '^[0-9]{13}$')} className="px-2 py-1 text-[10px] bg-slate-100 hover:bg-slate-200 rounded border border-slate-200 transition-colors">ID Card (13)</button>
+                        </>
+                      )}
+                      {element.type === 'email' && (
+                        <>
+                          <button type="button" onClick={() => handleChange('pattern', '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$')} className="px-2 py-1 text-[10px] bg-slate-100 hover:bg-slate-200 rounded border border-slate-200 transition-colors">Standard Email</button>
+                          <button type="button" onClick={() => handleChange('pattern', '^[a-zA-Z0-9._%+-]+@company\\.com$')} className="px-2 py-1 text-[10px] bg-slate-100 hover:bg-slate-200 rounded border border-slate-200 transition-colors">Company Domain</button>
+                          <button type="button" onClick={() => handleChange('pattern', '^[a-zA-Z0-9._%+-]+@(gmail|hotmail|yahoo)\\.com$')} className="px-2 py-1 text-[10px] bg-slate-100 hover:bg-slate-200 rounded border border-slate-200 transition-colors">Personal Email</button>
+                        </>
+                      )}
+                      {element.type === 'phone' && (
+                        <>
+                          <button type="button" onClick={() => handleChange('pattern', '^0[0-9]{9}$')} className="px-2 py-1 text-[10px] bg-slate-100 hover:bg-slate-200 rounded border border-slate-200 transition-colors">Thai Mobile (10)</button>
+                          <button type="button" onClick={() => handleChange('pattern', '^0[0-9]{8,9}$')} className="px-2 py-1 text-[10px] bg-slate-100 hover:bg-slate-200 rounded border border-slate-200 transition-colors">Thai Phone (9-10)</button>
+                          <button type="button" onClick={() => handleChange('pattern', '^\\+66[0-9]{9}$')} className="px-2 py-1 text-[10px] bg-slate-100 hover:bg-slate-200 rounded border border-slate-200 transition-colors">+66 Format</button>
+                          <button type="button" onClick={() => handleChange('pattern', '^0[689][0-9]{8}$')} className="px-2 py-1 text-[10px] bg-slate-100 hover:bg-slate-200 rounded border border-slate-200 transition-colors">Mobile Only</button>
+                        </>
+                      )}
+                      {element.type === 'textarea' && (
+                        <>
+                          <button type="button" onClick={() => handleChange('pattern', '^[^<>]+$')} className="px-2 py-1 text-[10px] bg-slate-100 hover:bg-slate-200 rounded border border-slate-200 transition-colors">No HTML Tags</button>
+                          <button type="button" onClick={() => handleChange('pattern', '^[\\w\\s.,!?-]+$')} className="px-2 py-1 text-[10px] bg-slate-100 hover:bg-slate-200 rounded border border-slate-200 transition-colors">Safe Text</button>
+                        </>
+                      )}
+                      {element.pattern && (
+                        <button type="button" onClick={() => handleChange('pattern', '')} className="px-2 py-1 text-[10px] bg-red-50 hover:bg-red-100 text-red-600 rounded border border-red-200 transition-colors">Clear</button>
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-slate-400">Regular expression for custom validation. Leave empty for default.</p>
+                </div>
              )}
 
              {element.type === 'number' && (
