@@ -187,7 +187,9 @@ const AppContainer: React.FC = () => {
     name: string;
     metadata: any; 
     elements: any[]; 
-    pages: any[]; 
+    pages: any[];
+    signers?: any[];
+    signerMode?: string;
   }) => {
     setForms(forms.map(f => 
       f.id === formId 
@@ -197,6 +199,8 @@ const AppContainer: React.FC = () => {
             metadata: data.metadata,
             elements: data.elements, 
             pages: data.pages,
+            signers: data.signers,
+            signerMode: data.signerMode,
             updatedAt: new Date().toISOString()
           }
         : f
@@ -209,6 +213,8 @@ const AppContainer: React.FC = () => {
     site?: string;
     description?: string;
     tags?: string[];
+    signers?: any[];
+    signerMode?: string;
   }) => {
     setForms(forms.map(f => 
       f.id === formId 
@@ -219,6 +225,8 @@ const AppContainer: React.FC = () => {
             site: settings.site,
             description: settings.description,
             tags: settings.tags,
+            signers: settings.signers,
+            signerMode: settings.signerMode,
             updatedAt: new Date().toISOString()
           }
         : f

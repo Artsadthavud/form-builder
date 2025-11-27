@@ -642,6 +642,92 @@ const Preview: React.FC<PreviewProps> = ({ elements, meta, currentLanguage, onLa
            />
         )}
 
+        {el.type === 'phone_otp' && (
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              {el.countryCode && (
+                <input 
+                  type="text"
+                  value={el.countryCode}
+                  disabled
+                  className="w-16 bg-slate-100 rounded-md shadow-sm text-sm border border-slate-300 p-2 text-center"
+                />
+              )}
+              <input 
+                type="tel"
+                placeholder={(resolved[`${el.id}:placeholder`] ?? getText(el.placeholder, currentLanguage)) || (currentLanguage === 'th' ? 'เบอร์โทรศัพท์' : 'Phone number')}
+                className={`block flex-1 bg-white rounded-md shadow-sm focus:ring-indigo-500 sm:text-sm border p-2 ${error ? 'border-red-300 focus:border-red-500' : 'border-slate-300 focus:border-indigo-500'}`}
+                value={fieldValue}
+                onChange={(e) => handleChange(el.id, e.target.value)}
+              />
+              <button
+                type="button"
+                className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700 transition-colors whitespace-nowrap"
+              >
+                📤 {currentLanguage === 'th' ? 'ส่ง OTP' : 'Send OTP'}
+              </button>
+            </div>
+            <div className="flex gap-2">
+              <input 
+                type="text"
+                placeholder={currentLanguage === 'th' ? 'กรอกรหัส OTP' : 'Enter OTP code'}
+                className="block flex-1 bg-white rounded-md shadow-sm focus:ring-indigo-500 sm:text-sm border border-slate-300 focus:border-indigo-500 p-2 tracking-widest text-center"
+                maxLength={el.otpConfig?.otpLength || 6}
+              />
+              <button
+                type="button"
+                className="px-4 py-2 bg-green-600 text-white text-sm rounded-md hover:bg-green-700 transition-colors whitespace-nowrap"
+              >
+                ✓ {currentLanguage === 'th' ? 'ยืนยัน' : 'Verify'}
+              </button>
+            </div>
+            <p className="text-xs text-slate-500">
+              {currentLanguage === 'th' 
+                ? `OTP ${el.otpConfig?.otpLength || 6} หลัก หมดอายุใน ${Math.floor((el.otpConfig?.expireSeconds || 300) / 60)} นาที` 
+                : `${el.otpConfig?.otpLength || 6}-digit OTP expires in ${Math.floor((el.otpConfig?.expireSeconds || 300) / 60)} minutes`}
+            </p>
+          </div>
+        )}
+
+        {el.type === 'email_otp' && (
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              <input 
+                type="email"
+                placeholder={(resolved[`${el.id}:placeholder`] ?? getText(el.placeholder, currentLanguage)) || (currentLanguage === 'th' ? 'อีเมล' : 'Email address')}
+                className={`block flex-1 bg-white rounded-md shadow-sm focus:ring-indigo-500 sm:text-sm border p-2 ${error ? 'border-red-300 focus:border-red-500' : 'border-slate-300 focus:border-indigo-500'}`}
+                value={fieldValue}
+                onChange={(e) => handleChange(el.id, e.target.value)}
+              />
+              <button
+                type="button"
+                className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700 transition-colors whitespace-nowrap"
+              >
+                📤 {currentLanguage === 'th' ? 'ส่ง OTP' : 'Send OTP'}
+              </button>
+            </div>
+            <div className="flex gap-2">
+              <input 
+                type="text"
+                placeholder={currentLanguage === 'th' ? 'กรอกรหัส OTP' : 'Enter OTP code'}
+                className="block flex-1 bg-white rounded-md shadow-sm focus:ring-indigo-500 sm:text-sm border border-slate-300 focus:border-indigo-500 p-2 tracking-widest text-center"
+                maxLength={el.otpConfig?.otpLength || 6}
+              />
+              <button
+                type="button"
+                className="px-4 py-2 bg-green-600 text-white text-sm rounded-md hover:bg-green-700 transition-colors whitespace-nowrap"
+              >
+                ✓ {currentLanguage === 'th' ? 'ยืนยัน' : 'Verify'}
+              </button>
+            </div>
+            <p className="text-xs text-slate-500">
+              {currentLanguage === 'th' 
+                ? `OTP ${el.otpConfig?.otpLength || 6} หลัก หมดอายุใน ${Math.floor((el.otpConfig?.expireSeconds || 300) / 60)} นาที` 
+                : `${el.otpConfig?.otpLength || 6}-digit OTP expires in ${Math.floor((el.otpConfig?.expireSeconds || 300) / 60)} minutes`}
+            </p>
+          </div>
+        )}
+
         {el.type === 'image' && (
           <div className={`w-full flex ${el.imageAlign === 'center' ? 'justify-center' : el.imageAlign === 'right' ? 'justify-end' : 'justify-start'}`}>
              {el.imageUrl && (

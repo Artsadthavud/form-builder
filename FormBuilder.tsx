@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { FormElement, ElementType, FormMetadata, FormProject, Language, FormPage, Calculation, SkipRule, FormTemplate } from './types';
+import { FormElement, ElementType, FormMetadata, FormProject, Language, FormPage, Calculation, SkipRule, FormTemplate, Signer, SignerMode } from './types';
 import Toolbox from './components/Toolbox';
 import Canvas from './components/Canvas';
 import PropertiesPanel from './components/PropertiesPanel';
@@ -12,8 +12,8 @@ import TemplateManager from './components/TemplateManager';
 
 interface FormBuilderProps {
   form: FormProject;
-  onSave: (data: { name: string; metadata: FormMetadata; elements: FormElement[]; pages: { id: string; label: string }[] }) => void;
-  onSaveSettings?: (settings: { name: string; codeName?: string; site?: string; description?: string; tags?: string[] }) => void;
+  onSave: (data: { name: string; metadata: FormMetadata; elements: FormElement[]; pages: { id: string; label: string }[]; signers?: Signer[]; signerMode?: SignerMode }) => void;
+  onSaveSettings?: (settings: { name: string; codeName?: string; site?: string; description?: string; tags?: string[]; signers?: Signer[]; signerMode?: SignerMode }) => void;
   onBack: () => void;
   onViewResponses: () => void;
   onViewRevisions?: () => void;
@@ -25,6 +25,8 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
   const [pages, setPages] = useState(form.pages);
   const [currentPageId, setCurrentPageId] = useState(form.pages[0]?.id || 'page_1');
   const [formMeta, setFormMeta] = useState<FormMetadata>(form.metadata);
+  const [signers, setSigners] = useState<Signer[]>(form.signers || []);
+  const [signerMode, setSignerMode] = useState<SignerMode>(form.signerMode || 'single');
   const DRAFT_KEY = `formflow_builder_draft_${form.id}`;
   const [autosaveEnabled, setAutosaveEnabled] = useState(true);
   const [currentLanguage, setCurrentLanguage] = useState<Language>(form.metadata.defaultLanguage || 'th');
@@ -37,8 +39,19 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
   const [showCalculationBuilder, setShowCalculationBuilder] = useState(false);
   const [showSkipLogicBuilder, setShowSkipLogicBuilder] = useState<string | null>(null); // page id
   const [showTemplateManager, setShowTemplateManager] = useState(false);
+  const [viewAsSignerId, setViewAsSignerId] = useState<string | null>(null); // Filter view by signer
   const fileInputRef = useRef<HTMLInputElement>(null);
   const csvInputRef = useRef<HTMLInputElement>(null);
+
+  // Sync signers from form prop when it changes (e.g., from settings modal)
+  useEffect(() => {
+    if (form.signers) {
+      setSigners(form.signers);
+    }
+    if (form.signerMode) {
+      setSignerMode(form.signerMode);
+    }
+  }, [form.signers, form.signerMode]);
 
   // Keep current language valid whenever available languages change
   useEffect(() => {
@@ -54,11 +67,11 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
   useEffect(() => {
     const timer = setTimeout(() => {
       if (autosaveEnabled) {
-        onSave({ name: formName, metadata: formMeta, elements, pages });
+        onSave({ name: formName, metadata: formMeta, elements, pages, signers, signerMode });
       }
     }, 1000);
     return () => clearTimeout(timer);
-  }, [formName, formMeta, elements, pages, autosaveEnabled]);
+  }, [formName, formMeta, elements, pages, signers, signerMode, autosaveEnabled]);
 
   // Undo/Redo history
   type Snapshot = { elements: FormElement[]; pages: { id: string; label: string }[]; metadata: FormMetadata; selectedId: string | null };
@@ -158,7 +171,7 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
   };
 
   const addElement = (type: ElementType, opts?: { parentId?: string; insertAfterId?: string; insertIndex?: number }) => {
-    const defaultLabels = {
+    const defaultLabels: Record<string, { th: string; en: string }> = {
       section: { th: 'ส่วนใหม่', en: 'New Section' },
       signature: { th: 'ลายเซ็น', en: 'Signature' },
       image: { th: 'รูปภาพ', en: 'Image' },
@@ -174,17 +187,19 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
       date: { th: 'วันที่ใหม่', en: 'New Date' },
       time: { th: 'เวลาใหม่', en: 'New Time' },
       file: { th: 'ไฟล์ใหม่', en: 'New File' },
-      rating: { th: 'คะแนนใหม่', en: 'New Rating' }
+      rating: { th: 'คะแนนใหม่', en: 'New Rating' },
+      phone_otp: { th: 'เบอร์โทร + OTP', en: 'Phone + OTP' },
+      email_otp: { th: 'อีเมล + OTP', en: 'Email + OTP' },
     };
     
     const newElement: FormElement = {
       id: generateId(type),
       type,
       label: defaultLabels[type] || { th: 'ใหม่', en: 'New' },
-      placeholder: ['text', 'textarea', 'number', 'email', 'phone', 'date', 'time'].includes(type) 
-        ? type === 'email' 
+      placeholder: ['text', 'textarea', 'number', 'email', 'phone', 'date', 'time', 'phone_otp', 'email_otp'].includes(type) 
+        ? type === 'email' || type === 'email_otp'
           ? { th: 'example@email.com', en: 'example@email.com' }
-          : type === 'phone'
+          : type === 'phone' || type === 'phone_otp'
           ? { th: '0812345678', en: '0812345678' }
           : { th: 'กรอกค่า...', en: 'Enter value...' }
         : undefined,
@@ -204,7 +219,24 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
       // Paragraph default
       content: type === 'paragraph' ? 'กรอกเนื้อหาข้อความที่นี่ คุณสามารถใช้พื้นที่นี้สำหรับคำแนะนำ ข้อจำกัดความรับผิดชอบ หรือข้อมูลเพิ่มเติม' : undefined,
       // Rating default
-      ratingMax: 5
+      ratingMax: 5,
+      // OTP defaults
+      otpConfig: (type === 'phone_otp' || type === 'email_otp') ? {
+        sendOtpEndpoint: '',
+        verifyOtpEndpoint: '',
+        otpLength: 6,
+        expireSeconds: 300,
+        resendDelaySeconds: 60,
+        maxAttempts: 3,
+        valueFieldName: type === 'phone_otp' ? 'phone' : 'email',
+        otpFieldName: 'otp',
+        sendButtonText: { th: 'ส่ง OTP', en: 'Send OTP' },
+        verifyButtonText: { th: 'ยืนยัน', en: 'Verify' },
+        resendButtonText: { th: 'ส่งใหม่', en: 'Resend' },
+        successMessage: { th: 'ยืนยันสำเร็จ', en: 'Verified successfully' },
+        errorMessage: { th: 'รหัส OTP ไม่ถูกต้อง', en: 'Invalid OTP code' },
+        expiredMessage: { th: 'รหัส OTP หมดอายุ', en: 'OTP code expired' },
+      } : undefined,
     };
     // assign page: if parent specified, use parent's pageId, else current page
     if (opts && opts.parentId) {
@@ -594,6 +626,14 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
 
   const selectedElement = elements.find(el => el.id === selectedId);
   const pageElements = elements.filter(el => el.pageId === currentPageId);
+  
+  // Filter elements by signer view (if selected)
+  const filteredPageElements = viewAsSignerId
+    ? pageElements.filter(el => !el.signerId || el.signerId === viewAsSignerId)
+    : pageElements;
+  
+  // Get current viewing signer info
+  const viewingSigner = viewAsSignerId ? signers.find(s => s.id === viewAsSignerId) : null;
 
   // Ensure selectable option-based elements always have an options array when selected
   React.useEffect(() => {
@@ -811,6 +851,34 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
               </>
             )}
           </div>
+          
+          {/* Signer View Selector */}
+          {signers.length > 0 && signerMode !== 'single' && (
+            <div className="ml-4 flex items-center gap-2 pl-4 border-l border-slate-200">
+              <span className="text-xs text-slate-500">มุมมอง:</span>
+              <select
+                value={viewAsSignerId || ''}
+                onChange={(e) => setViewAsSignerId(e.target.value || null)}
+                className={`px-2 py-1 border rounded text-sm ${
+                  viewAsSignerId 
+                    ? 'border-amber-300 bg-amber-50 text-amber-700' 
+                    : 'border-slate-200 bg-white text-slate-700'
+                }`}
+              >
+                <option value="">👁️ ทุกคน (Admin)</option>
+                {signers.map(s => (
+                  <option key={s.id} value={s.id}>
+                    ✍️ {s.order}. {s.name}
+                  </option>
+                ))}
+              </select>
+              {viewAsSignerId && viewingSigner && (
+                <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
+                  กำลังดูในมุมมอง: {viewingSigner.name}
+                </span>
+              )}
+            </div>
+          )}
         </div>
       </header>
 
@@ -831,10 +899,12 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
           <>
             <Toolbox onAdd={addElement} />
             <Canvas 
-              elements={pageElements} 
+              elements={filteredPageElements} 
               meta={formMeta}
               currentLanguage={currentLanguage}
               selectedId={selectedId} 
+              signers={signers}
+              viewAsSignerId={viewAsSignerId}
               onSelect={setSelectedId} 
               onMove={moveElement}
               onDelete={deleteElement}
@@ -848,6 +918,7 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
               allElements={elements}
               formMetadata={formMeta}
               currentLanguage={currentLanguage}
+              signers={signers}
               onLanguageChange={setCurrentLanguage}
               onUpdate={updateElement} 
               onDelete={deleteElement}
@@ -889,9 +960,12 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
       {showSettingsModal && onSaveSettings && (
         <FormSettingsModal
           form={form}
+          elements={elements}
           onSave={(settings) => {
             onSaveSettings(settings);
             setFormName(settings.name);
+            if (settings.signers) setSigners(settings.signers);
+            if (settings.signerMode) setSignerMode(settings.signerMode);
           }}
           onClose={() => setShowSettingsModal(false)}
         />

@@ -1,5 +1,5 @@
 
-export type ElementType = 'text' | 'email' | 'phone' | 'number' | 'textarea' | 'radio' | 'checkbox' | 'select' | 'section' | 'signature' | 'image' | 'date' | 'time' | 'file' | 'rating' | 'paragraph';
+export type ElementType = 'text' | 'email' | 'phone' | 'number' | 'textarea' | 'radio' | 'checkbox' | 'select' | 'section' | 'signature' | 'image' | 'date' | 'time' | 'file' | 'rating' | 'paragraph' | 'phone_otp' | 'email_otp';
 
 export type Language = 'th' | 'en';
 
@@ -193,6 +193,44 @@ export interface FormElement {
   // Advanced Logic: Piping - reference answers from other fields
   // Used in label/placeholder/content like "Hello {answer:field_123}"
   pipedFields?: string[]; // list of field IDs referenced via piping
+
+  // OTP Verification Configuration (for phone_otp, email_otp)
+  otpConfig?: OTPConfig;
+  
+  // Multi-Signer: กำหนดว่า element นี้เป็นของ signer คนไหน
+  signerId?: string;              // ID ของ signer ที่เป็นเจ้าของ element นี้
+  signerRequired?: boolean;       // signer คนนี้ต้องกรอก element นี้
+}
+
+// OTP Verification Configuration
+export interface OTPConfig {
+  // API Endpoints
+  sendOtpEndpoint: string;      // API endpoint to send OTP (POST)
+  verifyOtpEndpoint: string;    // API endpoint to verify OTP (POST)
+  
+  // Request Configuration
+  requestMethod?: 'POST' | 'GET';
+  requestHeaders?: Record<string, string>;  // Custom headers
+  
+  // Field mapping - which field in request body contains the phone/email
+  valueFieldName?: string;       // Default: 'phone' or 'email'
+  otpFieldName?: string;         // Default: 'otp'
+  
+  // OTP Settings
+  otpLength?: number;            // 4 or 6 digits, default 6
+  expireSeconds?: number;        // OTP expiry time, default 300 (5 min)
+  resendDelaySeconds?: number;   // Delay before allowing resend, default 60
+  maxAttempts?: number;          // Max verification attempts, default 3
+  
+  // UI Customization
+  sendButtonText?: string | TranslatableText;     // "ส่ง OTP" / "Send OTP"
+  verifyButtonText?: string | TranslatableText;   // "ยืนยัน" / "Verify"
+  resendButtonText?: string | TranslatableText;   // "ส่งใหม่" / "Resend"
+  
+  // Messages
+  successMessage?: string | TranslatableText;     // "ยืนยันสำเร็จ"
+  errorMessage?: string | TranslatableText;       // "รหัส OTP ไม่ถูกต้อง"
+  expiredMessage?: string | TranslatableText;     // "รหัส OTP หมดอายุ"
 }
 
 // Form Project Types
@@ -235,7 +273,60 @@ export interface FormProject {
   revisions?: FormRevision[]; // เก็บประวัติการแก้ไข
   tags?: string[]; // แท็กสำหรับจัดหมวดหมู่
   description?: string; // คำอธิบายฟอร์ม
+  
+  // Multi-Signer Configuration
+  signers?: Signer[];
+  signerMode?: SignerMode;
 }
+
+// --- Multi-Signer Types ---
+export type SignerMode = 
+  | 'single'           // ฟอร์มปกติ ไม่มี multi-signer
+  | 'sequential'       // เซ็นตามลำดับ
+  | 'parallel'         // เซ็นพร้อมกันได้
+  | 'approval';        // เซ็นแบบ approval chain
+
+export interface Signer {
+  id: string;
+  name: string;                           // ชื่อ role เช่น "ผู้ขอ", "ผู้อนุมัติ", "พยาน"
+  label: string | TranslatableText;       // Label แสดงในฟอร์ม
+  order: number;                          // ลำดับการเซ็น (สำหรับ sequential mode)
+  required: boolean;                      // จำเป็นต้องเซ็นหรือไม่
+  
+  // การกำหนดคนเซ็น
+  assignmentType: SignerAssignmentType;
+  assignedEmail?: string;                 // กำหนดคนเซ็นล่วงหน้า (predefined)
+  assignedField?: string;                 // ดึง email จาก field ในฟอร์ม (form_field)
+  signerOptions?: SignerOption[];         // รายชื่อให้เลือกตอน submit (on_submit)
+  
+  // การแจ้งเตือน
+  notifyOnReady?: boolean;               // แจ้งเมื่อถึงคิวเซ็น
+  reminderDays?: number;                 // เตือนซ้ำทุก X วัน
+  
+  // Section ที่คนนี้เข้าถึงได้ (สำหรับแบ่งส่วน)
+  accessibleSections?: string[];         // array ของ section IDs
+  canEditOtherSections?: boolean;        // สามารถแก้ไขส่วนอื่นได้หรือไม่
+  
+  // ลายเซ็น
+  signatureElementId?: string;           // element ID ของช่องลายเซ็นสำหรับคนนี้
+  signaturePosition?: 'inline' | 'end';  // เซ็นในส่วนของตัวเอง หรือตอนท้ายฟอร์ม
+}
+
+// ตัวเลือกผู้เซ็นสำหรับ on_submit type
+export interface SignerOption {
+  id: string;
+  name: string;
+  email: string;
+  department?: string;
+  position?: string;
+}
+
+export type SignerAssignmentType = 
+  | 'predefined'       // กำหนดล่วงหน้า (assignedEmail)
+  | 'form_field'       // ดึงจาก field ในฟอร์ม
+  | 'manual'           // ระบุตอน submit โดยผู้ส่ง
+  | 'on_submit'        // กำหนดจากการกด Submit (popup ให้เลือก)
+  | 'self';            // คนกรอกเซ็นเอง
 
 // Form Response Types
 export interface FormResponse {

@@ -1,26 +1,34 @@
 import React, { useState } from 'react';
-import { FormProject } from '../types';
+import { FormProject, Signer, SignerMode, FormElement } from '../types';
+import SignerManager from './SignerManager';
 
 interface FormSettingsModalProps {
   form: FormProject;
+  elements?: FormElement[];
   onSave: (settings: {
     name: string;
     codeName?: string;
     site?: string;
     description?: string;
     tags?: string[];
+    signers?: Signer[];
+    signerMode?: SignerMode;
   }) => void;
   onClose: () => void;
   isNewForm?: boolean;
 }
 
-const FormSettingsModal: React.FC<FormSettingsModalProps> = ({ form, onSave, onClose, isNewForm = false }) => {
+const FormSettingsModal: React.FC<FormSettingsModalProps> = ({ form, elements = [], onSave, onClose, isNewForm = false }) => {
+  const [activeTab, setActiveTab] = useState<'general' | 'signers'>('general');
   const [name, setName] = useState(form.name);
   const [codeName, setCodeName] = useState(form.codeName || '');
   const [site, setSite] = useState(form.site || '');
   const [description, setDescription] = useState(form.description || '');
   const [tags, setTags] = useState<string[]>(form.tags || []);
   const [tagInput, setTagInput] = useState('');
+  const [signers, setSigners] = useState<Signer[]>(form.signers || []);
+  const [signerMode, setSignerMode] = useState<SignerMode>(form.signerMode || 'single');
+  
   const statusInfo = {
     draft: {
       label: 'Draft',
@@ -70,7 +78,9 @@ const FormSettingsModal: React.FC<FormSettingsModalProps> = ({ form, onSave, onC
       codeName: codeName.trim() || undefined,
       site: site.trim() || undefined,
       description: description.trim() || undefined,
-      tags: tags.length > 0 ? tags : undefined
+      tags: tags.length > 0 ? tags : undefined,
+      signers: signerMode !== 'single' ? signers : undefined,
+      signerMode: signerMode
     });
     onClose();
   };
@@ -112,10 +122,40 @@ const FormSettingsModal: React.FC<FormSettingsModalProps> = ({ form, onSave, onC
               </div>
             </div>
           )}
+          
+          {/* Tabs */}
+          {!isNewForm && (
+            <div className="flex gap-1 mt-4 bg-white/10 rounded-lg p-1">
+              <button
+                type="button"
+                onClick={() => setActiveTab('general')}
+                className={`flex-1 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                  activeTab === 'general'
+                    ? 'bg-white text-indigo-600'
+                    : 'text-white/70 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                📝 ข้อมูลทั่วไป
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('signers')}
+                className={`flex-1 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                  activeTab === 'signers'
+                    ? 'bg-white text-indigo-600'
+                    : 'text-white/70 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                ✍️ ผู้เซ็น ({signerMode === 'single' ? 'ปิด' : signers.length})
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 custom-scrollbar">
+          {/* General Tab */}
+          {(activeTab === 'general' || isNewForm) && (
           <div className={`grid gap-5 ${isNewForm ? 'lg:grid-cols-[2fr,1fr]' : 'lg:grid-cols-[2fr,1.2fr]'}`}>
             <div className="space-y-4">
               <section className="border border-slate-100 rounded-xl p-4 space-y-4">
@@ -266,9 +306,22 @@ const FormSettingsModal: React.FC<FormSettingsModalProps> = ({ form, onSave, onC
               </div>
             )}
           </div>
+          )}
+
+          {/* Signers Tab */}
+          {activeTab === 'signers' && !isNewForm && (
+            <SignerManager
+              signers={signers}
+              signerMode={signerMode}
+              elements={elements}
+              onSignersChange={setSigners}
+              onModeChange={setSignerMode}
+              currentLanguage="th"
+            />
+          )}
 
           {/* Actions */}
-          <div className="flex gap-3 pt-4 border-t border-slate-100">
+          <div className="flex gap-3 pt-4 border-t border-slate-100 mt-4">
             <button
               type="button"
               onClick={onClose}

@@ -15,6 +15,10 @@ const groupedTools: Record<string, { type: ElementType; icon: string; label: str
     { type: 'number', label: 'Number Input', icon: '#' },
     { type: 'paragraph', label: 'Text Block', icon: '¶' },
   ],
+  Verification: [
+    { type: 'phone_otp', label: 'Phone + OTP', icon: '📱' },
+    { type: 'email_otp', label: 'Email + OTP', icon: '✉️' },
+  ],
   Choice: [
     { type: 'select', label: 'Dropdown', icon: '▼' },
     { type: 'radio', label: 'Radio Group', icon: '◉' },

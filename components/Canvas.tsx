@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { FormElement, FormMetadata, ElementType, Language, TranslatableText } from '../types';
+import { FormElement, FormMetadata, ElementType, Language, TranslatableText, Signer } from '../types';
 import { getText } from '../utils/i18n';
 import { buildCustomStyles, buildCustomClasses } from '../utils/styles';
 
@@ -17,6 +17,8 @@ interface CanvasProps {
   meta: FormMetadata;
   currentLanguage: Language;
   selectedId: string | null;
+  signers?: Signer[];
+  viewAsSignerId?: string | null;
   onSelect: (id: string) => void;
   onMove: (dragIndex: number, hoverIndex: number) => void;
   onDelete: (id: string) => void;
@@ -26,7 +28,7 @@ interface CanvasProps {
   onAdd: (type: ElementType, opts?: { parentId?: string; insertAfterId?: string; insertIndex?: number }) => void;
 }
 
-const Canvas: React.FC<CanvasProps> = ({ elements, meta, currentLanguage, selectedId, onSelect, onMove, onDelete, onDuplicate, onReparent, onUpdateMeta, onAdd }) => {
+const Canvas: React.FC<CanvasProps> = ({ elements, meta, currentLanguage, selectedId, signers = [], viewAsSignerId, onSelect, onMove, onDelete, onDuplicate, onReparent, onUpdateMeta, onAdd }) => {
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [isDragOverHeader, setIsDragOverHeader] = useState(false);
 
@@ -237,6 +239,38 @@ const Canvas: React.FC<CanvasProps> = ({ elements, meta, currentLanguage, select
             )}
           </div>
         );
+      case 'phone_otp':
+      case 'email_otp':
+        return (
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              <div className="flex-1 h-9 border border-slate-300 rounded bg-slate-50 px-3 flex items-center text-slate-400 text-sm">
+                {getCanvasText(el.placeholder, lang) || (el.type === 'phone_otp' ? '0812345678' : 'example@email.com')}
+              </div>
+              <button className="px-3 py-1.5 bg-emerald-500 text-white text-xs font-medium rounded hover:bg-emerald-600 transition-colors whitespace-nowrap">
+                {lang === 'th' ? 'ส่ง OTP' : 'Send OTP'}
+              </button>
+            </div>
+            <div className="flex gap-2 items-center">
+              <div className="flex gap-1">
+                {[...Array(el.otpConfig?.otpLength || 6)].map((_, i) => (
+                  <div key={i} className="w-8 h-9 border border-slate-300 rounded bg-slate-50 flex items-center justify-center text-slate-400 text-sm">
+                    _
+                  </div>
+                ))}
+              </div>
+              <button className="px-3 py-1.5 bg-slate-200 text-slate-600 text-xs font-medium rounded hover:bg-slate-300 transition-colors">
+                {lang === 'th' ? 'ยืนยัน' : 'Verify'}
+              </button>
+            </div>
+            <div className="flex items-center gap-1 text-[10px] text-emerald-600">
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              </svg>
+              <span>OTP Verification Required</span>
+            </div>
+          </div>
+        );
       case 'file':
         return (
           <div className="h-9 w-full border border-slate-300 rounded bg-slate-50 px-3 flex items-center text-slate-400 text-sm gap-2">
@@ -383,6 +417,23 @@ const Canvas: React.FC<CanvasProps> = ({ elements, meta, currentLanguage, select
                       {getCanvasText(el.label, currentLanguage) || `[${(currentLanguage || 'th').toUpperCase()}]`} {el.required && <span className="text-red-500">*</span>}
                     </label>
                     <div className="flex items-center gap-1.5">
+                      {/* Signer Badge */}
+                      {el.signerId && signers.length > 0 && (() => {
+                        const signer = signers.find(s => s.id === el.signerId);
+                        if (!signer) return null;
+                        return (
+                          <div className="relative group/signer">
+                            <span className="text-[10px] bg-gradient-to-r from-amber-100 to-orange-100 text-amber-700 px-2 py-1 rounded-full font-bold border border-amber-200 shadow-sm flex items-center gap-1 cursor-help">
+                              ✍️ {signer.order}
+                            </span>
+                            <div className="absolute bottom-full right-0 mb-2 w-40 bg-slate-900 text-white text-xs rounded-lg p-2 opacity-0 group-hover/signer:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl">
+                              <div className="font-semibold mb-1">Signer Assignment</div>
+                              <div className="text-slate-300">{signer.name}</div>
+                              <div className="absolute top-full right-4 -mt-1 border-4 border-transparent border-t-slate-900"></div>
+                            </div>
+                          </div>
+                        );
+                      })()}
                       {el.logic && el.logic.conditions.length > 0 && (
                         <div className="relative group/logic">
                           <span className="text-[10px] bg-gradient-to-r from-purple-100 to-indigo-100 text-purple-700 px-2 py-1 rounded-full font-bold border border-purple-200 shadow-sm flex items-center gap-1 cursor-help">
