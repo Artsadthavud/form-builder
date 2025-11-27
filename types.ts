@@ -14,6 +14,20 @@ export interface Option {
   value: string;
 }
 
+export interface TokenSource {
+  token: string; // token name, e.g. "user.name" or "Address"
+  source: {
+    type: 'static' | 'api';
+    // for static: `value` may contain a literal or templated JSON string
+    // for api: `url` may be a real endpoint or a mock:// key
+    url?: string;
+    value?: string;
+    mock?: boolean;
+    dataPath?: string; // path inside the returned JSON to pick the data (e.g. "data.items")
+    valueField?: string; // field name inside array/object to use as value
+  };
+}
+
 export type ConditionOperator = 'equals' | 'not_equals' | 'contains' | 'not_contains';
 
 export interface Condition {
@@ -55,6 +69,8 @@ export interface FormElement {
   placeholder?: string | TranslatableText;
   required: boolean;
   options?: Option[]; // For radio, checkbox, select
+  // Default selected value(s) for choice fields (radio/select => string, checkbox => string[])
+  defaultValue?: string | string[];
   logic?: Logic;      // Complex dependency logic
   parentId?: string;  // For nesting inside sections
   orientation?: 'vertical' | 'horizontal'; // For radio and checkbox groups
@@ -72,7 +88,7 @@ export interface FormElement {
   signatureHeight?: number;
 
   // Paragraph / Rich Text specific
-  content?: string;
+  content?: string | TranslatableText;
 
   // Rating specific
   ratingMax?: number;
@@ -120,6 +136,9 @@ export interface FormElement {
   
   // For sections
   children?: FormElement[];
+
+  // Token sources for template replacement in label/content/placeholder
+  tokenSources?: TokenSource[];
   
   // For rating
   maxRating?: number;

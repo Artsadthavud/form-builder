@@ -1,9 +1,10 @@
 import { FormElement } from '../types';
+import type { CSSProperties } from 'react';
 
-export function buildCustomStyles(element: FormElement): React.CSSProperties {
+export function buildCustomStyles(element: FormElement): CSSProperties {
   if (!element.customStyles) return {};
   
-  const styles: React.CSSProperties = {};
+  const styles: CSSProperties = {};
   
   if (element.customStyles.backgroundColor) {
     styles.backgroundColor = element.customStyles.backgroundColor;
@@ -40,6 +41,6 @@ export function buildCustomClasses(element: FormElement): string {
   return element.customClass || '';
 }
 
-export function mergeStyles(baseStyle: React.CSSProperties, customStyle: React.CSSProperties): React.CSSProperties {
+export function mergeStyles(baseStyle: CSSProperties, customStyle: CSSProperties): CSSProperties {
   return { ...baseStyle, ...customStyle };
 }

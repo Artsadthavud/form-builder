@@ -3,6 +3,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { FormElement, Condition, FormMetadata, Language } from '../types';
 import { getText } from '../utils/i18n';
 import { buildCustomStyles, buildCustomClasses } from '../utils/styles';
+import { resolveTemplateWithSources } from '../utils/templateResolver';
+import mockFetch from '../utils/mockApi';
 
 interface PreviewProps {
   elements: FormElement[];
@@ -228,6 +230,55 @@ const Preview: React.FC<PreviewProps> = ({ elements, meta, currentLanguage, onLa
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [visibleIds, setVisibleIds] = useState<Set<string>>(new Set());
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [resolved, setResolved] = useState<Record<string, string>>({});
+  const seededDefaults = useRef(false);
+
+  // seed defaults once from element.defaultValue
+  useEffect(() => {
+    if (seededDefaults.current) return;
+    const initial: Record<string, any> = {};
+    elements.forEach(el => {
+      if (el.defaultValue !== undefined) initial[el.id] = el.defaultValue;
+    });
+    if (Object.keys(initial).length > 0) setFormData(prev => ({ ...initial, ...prev }));
+    seededDefaults.current = true;
+  }, [elements]);
+
+  // resolve templates for elements that declare tokenSources
+  useEffect(() => {
+    let mounted = true;
+    const fetcher = async (url: string) => {
+      try {
+        if (!url) return {};
+        if (url.startsWith('mock://')) return await mockFetch(url);
+        const res = await fetch(url);
+        if (!res.ok) return {};
+        return await res.json();
+      } catch (e) {
+        return {};
+      }
+    };
+
+    const run = async () => {
+      const out: Record<string, string> = {};
+      for (const el of elements) {
+        const sources = (el as any).tokenSources;
+        if (!sources || sources.length === 0) continue;
+        if (typeof el.label === 'string') out[`${el.id}:label`] = await resolveTemplateWithSources(el.label, sources, fetcher);
+        if (typeof el.placeholder === 'string') out[`${el.id}:placeholder`] = await resolveTemplateWithSources(el.placeholder, sources, fetcher);
+        if (el.type === 'paragraph' && typeof el.content === 'string') out[`${el.id}:content`] = await resolveTemplateWithSources(el.content, sources, fetcher);
+        if (el.options && el.options.length) {
+          for (const opt of el.options) {
+            if (typeof opt.label === 'string') out[`${el.id}:opt:${opt.id}`] = await resolveTemplateWithSources(opt.label as string, sources, fetcher);
+          }
+        }
+      }
+      if (mounted) setResolved(prev => ({ ...prev, ...out }));
+    };
+
+    run();
+    return () => { mounted = false; };
+  }, [elements, currentLanguage]);
 
   useEffect(() => {
     const newVisible = new Set<string>();
@@ -407,7 +458,7 @@ const Preview: React.FC<PreviewProps> = ({ elements, meta, currentLanguage, onLa
     if (el.type === 'paragraph') {
       return (
         <div className="text-slate-700 whitespace-pre-wrap text-sm">
-          {getText(el.content, currentLanguage)}
+          {resolved[`${el.id}:content`] ?? getText(el.content, currentLanguage)}
         </div>
       );
     }
@@ -418,13 +469,13 @@ const Preview: React.FC<PreviewProps> = ({ elements, meta, currentLanguage, onLa
         style={buildCustomStyles(el)}
       >
         <label className="block text-sm font-medium text-slate-700">
-          {getText(el.label, currentLanguage)} {el.required && <span className="text-red-500">*</span>}
+          {resolved[`${el.id}:label`] ?? getText(el.label, currentLanguage)} {el.required && <span className="text-red-500">*</span>}
         </label>
         
         {el.type === 'text' && (
           <input 
             type="text"
-            placeholder={getText(el.placeholder, currentLanguage)}
+            placeholder={resolved[`${el.id}:placeholder`] ?? getText(el.placeholder, currentLanguage)}
             className={`block w-full bg-white rounded-md shadow-sm focus:ring-indigo-500 sm:text-sm border p-2 ${error ? 'border-red-300 focus:border-red-500' : 'border-slate-300 focus:border-indigo-500'}`}
             value={fieldValue}
             onChange={(e) => handleChange(el.id, e.target.value)}
@@ -455,7 +506,7 @@ const Preview: React.FC<PreviewProps> = ({ elements, meta, currentLanguage, onLa
             )}
             <input 
               type="tel"
-              placeholder={getText(el.placeholder, currentLanguage)}
+              placeholder={resolved[`${el.id}:placeholder`] ?? getText(el.placeholder, currentLanguage)}
               className={`block flex-1 bg-white rounded-md shadow-sm focus:ring-indigo-500 sm:text-sm border p-2 ${error ? 'border-red-300 focus:border-red-500' : 'border-slate-300 focus:border-indigo-500'}`}
               value={fieldValue}
               onChange={(e) => handleChange(el.id, e.target.value)}
@@ -467,7 +518,7 @@ const Preview: React.FC<PreviewProps> = ({ elements, meta, currentLanguage, onLa
         {el.type === 'number' && (
           <input 
             type="number"
-            placeholder={getText(el.placeholder, currentLanguage)}
+            placeholder={resolved[`${el.id}:placeholder`] ?? getText(el.placeholder, currentLanguage)}
             className={`block w-full bg-white rounded-md shadow-sm focus:ring-indigo-500 sm:text-sm border p-2 ${error ? 'border-red-300 focus:border-red-500' : 'border-slate-300 focus:border-indigo-500'}`}
             value={fieldValue}
             onChange={(e) => handleChange(el.id, e.target.value)}
@@ -478,7 +529,7 @@ const Preview: React.FC<PreviewProps> = ({ elements, meta, currentLanguage, onLa
 
         {el.type === 'textarea' && (
            <textarea 
-             placeholder={getText(el.placeholder, currentLanguage)}
+             placeholder={resolved[`${el.id}:placeholder`] ?? getText(el.placeholder, currentLanguage)}
              rows={3}
              className={`block w-full bg-white rounded-md shadow-sm focus:ring-indigo-500 sm:text-sm border p-2 ${error ? 'border-red-300 focus:border-red-500' : 'border-slate-300 focus:border-indigo-500'}`}
              value={fieldValue}
@@ -536,7 +587,7 @@ const Preview: React.FC<PreviewProps> = ({ elements, meta, currentLanguage, onLa
           >
             <option value="">{currentLanguage === 'th' ? 'เลือก...' : 'Select...'}</option>
             {el.options?.map(opt => (
-              <option key={opt.id} value={opt.value}>{getText(opt.label, currentLanguage)}</option>
+              <option key={opt.id} value={opt.value}>{resolved[`${el.id}:opt:${opt.id}`] ?? getText(opt.label, currentLanguage)}</option>
             ))}
           </select>
         )}
@@ -555,7 +606,7 @@ const Preview: React.FC<PreviewProps> = ({ elements, meta, currentLanguage, onLa
                   className="h-4 w-4 border-slate-300 text-indigo-600 focus:ring-indigo-500 bg-white"
                 />
                 <label htmlFor={`${el.id}_${opt.id}`} className="ml-2 block text-sm text-slate-700">
-                  {getText(opt.label, currentLanguage)}
+                  {resolved[`${el.id}:opt:${opt.id}`] ?? getText(opt.label, currentLanguage)}
                 </label>
               </div>
             ))}
@@ -575,7 +626,7 @@ const Preview: React.FC<PreviewProps> = ({ elements, meta, currentLanguage, onLa
                   className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 bg-white"
                 />
                 <label htmlFor={`${el.id}_${opt.id}`} className="ml-2 block text-sm text-slate-700">
-                  {getText(opt.label, currentLanguage)}
+                  {resolved[`${el.id}:opt:${opt.id}`] ?? getText(opt.label, currentLanguage)}
                 </label>
               </div>
             ))}

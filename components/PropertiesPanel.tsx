@@ -520,7 +520,16 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   const removeOption = (idx: number) => {
     if (!element.options) return;
     const newOptions = element.options.filter((_, i) => i !== idx);
+    // sanitize defaultValue if it referenced removed option(s)
+    const remainingValues = newOptions.map(o => o.value);
+    let nextDefault: string | string[] | undefined = element.defaultValue;
+    if (typeof nextDefault === 'string') {
+      if (!remainingValues.includes(nextDefault)) nextDefault = undefined;
+    } else if (Array.isArray(nextDefault)) {
+      nextDefault = (nextDefault as string[]).filter(v => remainingValues.includes(v));
+    }
     handleChange('options', newOptions);
+    handleChange('defaultValue', nextDefault);
   };
 
   // ... Drag and Drop options handlers from previous logic ...
@@ -819,6 +828,33 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                 className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
                 placeholder={currentLanguage === 'th' ? 'ข้อความตัวอย่าง (ไทย)' : 'Placeholder (English)'}
               />
+              {/* Default value for simple input types */}
+              {(['text','email','phone','number','textarea','date','time'] as const).includes(element.type as any) && (
+                <div className="mt-3">
+                  <label className="block text-xs font-medium text-slate-700 mb-1">Default Value</label>
+                  {element.type === 'textarea' ? (
+                    <textarea
+                      rows={3}
+                      value={typeof element.defaultValue === 'string' ? element.defaultValue : ''}
+                      onChange={(e) => handleChange('defaultValue', e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm bg-white"
+                    />
+                  ) : element.type === 'number' ? (
+                    <input
+                      type="number"
+                      value={typeof element.defaultValue === 'string' ? element.defaultValue : (typeof element.defaultValue === 'number' ? String(element.defaultValue) : '')}
+                      onChange={(e) => handleChange('defaultValue', e.target.value)}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm bg-white"
+                    />
+                  ) : element.type === 'date' ? (
+                    <input type="date" value={typeof element.defaultValue === 'string' ? element.defaultValue : ''} onChange={(e) => handleChange('defaultValue', e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm bg-white" />
+                  ) : element.type === 'time' ? (
+                    <input type="time" value={typeof element.defaultValue === 'string' ? element.defaultValue : ''} onChange={(e) => handleChange('defaultValue', e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm bg-white" />
+                  ) : (
+                    <input type="text" value={typeof element.defaultValue === 'string' ? element.defaultValue : ''} onChange={(e) => handleChange('defaultValue', e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm bg-white" />
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -925,6 +961,37 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                               onChange={(e) => handleOptionChange(idx, 'value', e.target.value)}
                               className="w-24 px-2 py-1 border border-slate-300 rounded text-sm bg-white font-mono text-xs"
                             />
+                            {/* Default selector */}
+                            {element.type === 'radio' || element.type === 'select' ? (
+                              <label className="flex items-center gap-1 text-xs" title="Default">
+                                <input
+                                  type="radio"
+                                  name={`default-${element.id}`}
+                                  className="h-4 w-4"
+                                  checked={element.defaultValue === opt.value}
+                                  onChange={() => handleChange('defaultValue', opt.value)}
+                                />
+                              </label>
+                            ) : null}
+                            {element.type === 'checkbox' ? (
+                              <label className="flex items-center gap-1 text-xs" title="Default checked">
+                                <input
+                                  type="checkbox"
+                                  className="h-4 w-4"
+                                  checked={Array.isArray(element.defaultValue) && (element.defaultValue as string[]).includes(opt.value)}
+                                  onChange={(e) => {
+                                    const cur = Array.isArray(element.defaultValue) ? [...(element.defaultValue as string[])] : [];
+                                    if (e.target.checked) {
+                                      if (!cur.includes(opt.value)) cur.push(opt.value);
+                                    } else {
+                                      const i = cur.indexOf(opt.value);
+                                      if (i >= 0) cur.splice(i, 1);
+                                    }
+                                    handleChange('defaultValue', cur);
+                                  }}
+                                />
+                              </label>
+                            ) : null}
                             <button onClick={() => removeOption(idx)} className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded">×</button>
                           </div>
                         </div>
