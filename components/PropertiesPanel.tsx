@@ -740,7 +740,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
         </div>
 
         {/* Validation Rules */}
-        {(element.type === 'text' || element.type === 'textarea' || element.type === 'number' || element.type === 'date' || element.type === 'email' || element.type === 'file') && (
+        {(element.type === 'text' || element.type === 'textarea' || element.type === 'number' || element.type === 'date' || element.type === 'email' || element.type === 'phone' || element.type === 'file') && (
           <div className="bg-white rounded-xl p-4 border-2 border-slate-200 shadow-sm space-y-3">
             <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
               <svg className="w-4 h-4 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">

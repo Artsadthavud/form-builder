@@ -68,6 +68,12 @@ export function evaluateCondition(
     case 'ends_with':
       return String(targetValue ?? '').toLowerCase().endsWith(String(conditionValue).toLowerCase());
     
+    case 'not_starts_with':
+      return !String(targetValue ?? '').toLowerCase().startsWith(String(conditionValue).toLowerCase());
+    
+    case 'not_ends_with':
+      return !String(targetValue ?? '').toLowerCase().endsWith(String(conditionValue).toLowerCase());
+    
     default:
       return true;
   }
@@ -319,18 +325,20 @@ export function evaluateSkipRules(
  * Get all available operator labels (for UI)
  */
 export const operatorLabels: Record<ConditionOperator, { th: string; en: string }> = {
-  equals: { th: 'เท่ากับ', en: 'equals' },
-  not_equals: { th: 'ไม่เท่ากับ', en: 'not equals' },
-  contains: { th: 'มีคำว่า', en: 'contains' },
-  not_contains: { th: 'ไม่มีคำว่า', en: 'not contains' },
-  is_empty: { th: 'ว่างเปล่า', en: 'is empty' },
-  is_not_empty: { th: 'ไม่ว่างเปล่า', en: 'is not empty' },
-  greater_than: { th: 'มากกว่า', en: 'greater than' },
-  less_than: { th: 'น้อยกว่า', en: 'less than' },
-  greater_equal: { th: 'มากกว่าหรือเท่ากับ', en: 'greater or equal' },
-  less_equal: { th: 'น้อยกว่าหรือเท่ากับ', en: 'less or equal' },
-  starts_with: { th: 'เริ่มต้นด้วย', en: 'starts with' },
-  ends_with: { th: 'ลงท้ายด้วย', en: 'ends with' },
+  equals: { th: 'เท่ากับ', en: 'Equals' },
+  not_equals: { th: 'ไม่เท่ากับ', en: 'Is not equal to' },
+  contains: { th: 'มีคำว่า', en: 'Contains' },
+  not_contains: { th: 'ไม่มีคำว่า', en: 'Does not contain' },
+  is_empty: { th: 'ว่างเปล่า (NULL)', en: 'Is NULL' },
+  is_not_empty: { th: 'ไม่ว่างเปล่า (NOT NULL)', en: 'Is not NULL' },
+  greater_than: { th: 'มากกว่า', en: 'Greater than' },
+  less_than: { th: 'น้อยกว่า', en: 'Less than' },
+  greater_equal: { th: 'มากกว่าหรือเท่ากับ', en: 'Greater or equal' },
+  less_equal: { th: 'น้อยกว่าหรือเท่ากับ', en: 'Less or equal' },
+  starts_with: { th: 'เริ่มต้นด้วย', en: 'Starts with' },
+  ends_with: { th: 'ลงท้ายด้วย', en: 'Ends with' },
+  not_starts_with: { th: 'ไม่เริ่มต้นด้วย', en: 'Does not start with' },
+  not_ends_with: { th: 'ไม่ลงท้ายด้วย', en: 'Does not end with' },
 };
 
 /**
@@ -339,7 +347,8 @@ export const operatorLabels: Record<ConditionOperator, { th: string; en: string 
 export function getOperatorsForType(fieldType: string): ConditionOperator[] {
   const textOperators: ConditionOperator[] = [
     'equals', 'not_equals', 'contains', 'not_contains', 
-    'is_empty', 'is_not_empty', 'starts_with', 'ends_with'
+    'starts_with', 'not_starts_with', 'ends_with', 'not_ends_with',
+    'is_empty', 'is_not_empty'
   ];
   
   const numericOperators: ConditionOperator[] = [

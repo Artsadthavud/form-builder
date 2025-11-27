@@ -33,7 +33,8 @@ export type ConditionOperator =
   | 'contains' | 'not_contains'
   | 'is_empty' | 'is_not_empty'
   | 'greater_than' | 'less_than' | 'greater_equal' | 'less_equal'
-  | 'starts_with' | 'ends_with';
+  | 'starts_with' | 'ends_with'
+  | 'not_starts_with' | 'not_ends_with';
 
 export interface Condition {
   id: string;
