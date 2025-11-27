@@ -1,8 +1,157 @@
 
-import React, { useState } from 'react';
+import React, { useState, useCallback, useMemo, memo } from 'react';
 import { FormElement, FormMetadata, ElementType, Language, TranslatableText, Signer } from '../types';
 import { getText } from '../utils/i18n';
 import { buildCustomStyles, buildCustomClasses } from '../utils/styles';
+
+// Memoized Canvas Element Item Component
+interface CanvasElementItemProps {
+  el: FormElement;
+  index: number;
+  currentLanguage: Language;
+  selectedId: string | null;
+  draggedId: string | null;
+  signers: Signer[];
+  onSelect: (id: string) => void;
+  onDuplicate: (id: string) => void;
+  onDelete: (id: string) => void;
+  onDragStart: (e: React.DragEvent, id: string) => void;
+  onDragOver: (e: React.DragEvent, index: number) => void;
+  renderReadOnlyInput: (el: FormElement) => React.ReactNode;
+  renderChildren?: (parentId: string) => React.ReactNode;
+}
+
+const CanvasElementItem = memo<CanvasElementItemProps>(({
+  el,
+  index,
+  currentLanguage,
+  selectedId,
+  draggedId,
+  signers,
+  onSelect,
+  onDuplicate,
+  onDelete,
+  onDragStart,
+  onDragOver,
+  renderReadOnlyInput,
+  renderChildren
+}) => {
+  const getCanvasTextLocal = (text: string | TranslatableText | undefined): string => {
+    if (!text) return '';
+    if (typeof text === 'string') return text;
+    return text[currentLanguage] || '';
+  };
+
+  return (
+    <div
+      draggable
+      onDragStart={(e) => onDragStart(e, el.id)}
+      onDragOver={(e) => onDragOver(e, index)}
+      onClick={(e) => {
+        e.stopPropagation();
+        onSelect(el.id);
+      }}
+      style={{ width: el.type === 'section' ? '100%' : `${el.width || 100}%` }}
+      className={`
+        relative px-2 mb-4
+        ${draggedId === el.id ? 'opacity-50' : 'opacity-100'}
+      `}
+    >
+      <div 
+        className={`
+          group rounded-lg transition-all cursor-move h-full
+          ${selectedId === el.id 
+            ? 'ring-2 ring-indigo-500 ring-offset-2 z-10' 
+            : 'hover:ring-1 hover:ring-slate-300'}
+          ${el.type === 'section' ? 'bg-white border-2 border-dashed border-slate-300 p-4 pt-8' : 'bg-white border border-slate-200 p-4'}
+          ${buildCustomClasses(el)}
+        `}
+        style={buildCustomStyles(el)}
+      >
+        {/* Action Buttons */}
+        <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-auto z-20">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDuplicate(el.id);
+            }}
+            className="p-1 bg-indigo-500 hover:bg-indigo-600 text-white rounded text-xs font-medium shadow-sm"
+            title="Duplicate"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (confirm(`Delete "${getCanvasTextLocal(el.label) || el.id}"?`)) {
+                onDelete(el.id);
+              }
+            }}
+            className="p-1 bg-red-500 hover:bg-red-600 text-white rounded text-xs font-medium shadow-sm"
+            title="Delete"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
+        </div>
+
+        {el.type !== 'image' && (
+          <div className="flex items-center justify-between mb-2 pointer-events-none">
+            <label className={`block font-medium ${el.type === 'section' ? 'text-indigo-600 font-bold text-sm uppercase tracking-wider' : 'text-sm text-slate-700'}`}>
+              {getCanvasTextLocal(el.label) || `[${currentLanguage.toUpperCase()}]`} {el.required && <span className="text-red-500">*</span>}
+            </label>
+            <div className="flex items-center gap-1.5">
+              {/* Signer Badge */}
+              {el.signerId && signers.length > 0 && (() => {
+                const signer = signers.find(s => s.id === el.signerId);
+                if (!signer) return null;
+                return (
+                  <span className="text-[10px] bg-gradient-to-r from-amber-100 to-orange-100 text-amber-700 px-2 py-1 rounded-full font-bold border border-amber-200 shadow-sm">
+                    ✍️ {signer.order}
+                  </span>
+                );
+              })()}
+              {el.logic && el.logic.conditions.length > 0 && (
+                <span className="text-[10px] bg-gradient-to-r from-purple-100 to-indigo-100 text-purple-700 px-2 py-1 rounded-full font-bold border border-purple-200 shadow-sm flex items-center gap-1">
+                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z" />
+                  </svg>
+                  {el.logic.conditions.length}
+                </span>
+              )}
+              <span className="text-xs text-slate-300 font-mono">{el.width}%</span>
+            </div>
+          </div>
+        )}
+
+        {/* Section Content or Input Render */}
+        {el.type === 'section' ? (
+          <div className="min-h-[120px] bg-slate-50/50 rounded border-2 border-dashed border-slate-200 transition-all p-3">
+            {renderChildren?.(el.id)}
+          </div>
+        ) : (
+          <div className="pointer-events-none">
+            {renderReadOnlyInput(el)}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}, (prevProps, nextProps) => {
+  // Custom comparison for better memoization
+  return (
+    prevProps.el.id === nextProps.el.id &&
+    prevProps.selectedId === nextProps.selectedId &&
+    prevProps.draggedId === nextProps.draggedId &&
+    prevProps.currentLanguage === nextProps.currentLanguage &&
+    prevProps.el === nextProps.el
+  );
+});
+
+CanvasElementItem.displayName = 'CanvasElementItem';
 
 // Get text for Canvas - show only selected language, no fallback
 const getCanvasText = (text: string | TranslatableText | undefined, language: Language | undefined): string => {

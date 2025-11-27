@@ -1,5 +1,5 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { FormElement, ElementType, FormMetadata, FormProject, Language, FormPage, Calculation, SkipRule, FormTemplate, Signer, SignerMode } from './types';
 import Toolbox from './components/Toolbox';
 import Canvas from './components/Canvas';
@@ -111,7 +111,7 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
     return () => clearTimeout(timer);
   }, [elements, pages, formMeta, selectedId, takeSnapshot]);
 
-  const undo = () => {
+  const undo = useCallback(() => {
     if (historyPast.length === 0) return;
     const prev = historyPast[historyPast.length - 1];
     const present = takeSnapshot();
@@ -123,9 +123,9 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
     setFormMeta(prev.metadata);
     setSelectedId(prev.selectedId);
     lastSnapshotRef.current = prev;
-  };
+  }, [historyPast, takeSnapshot]);
 
-  const redo = () => {
+  const redo = useCallback(() => {
     if (historyFuture.length === 0) return;
     const next = historyFuture[0];
     const present = takeSnapshot();
@@ -136,7 +136,7 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
     setFormMeta(next.metadata);
     setSelectedId(next.selectedId);
     lastSnapshotRef.current = next;
-  };
+  }, [historyFuture, takeSnapshot]);
 
   // Keyboard shortcuts for undo/redo
   React.useEffect(() => {
@@ -161,14 +161,14 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
   }, [undo, redo, historyPast.length, historyFuture.length]);
 
   // Helper to generate unique IDs
-  const generateId = (type: string) => {
+  const generateId = useCallback((type: string) => {
     const count = elements.filter(e => e.type === type).length + 1;
     let newId = `${type}_${count}`;
     while (elements.find(e => e.id === newId)) {
       newId = `${newId}_${Math.floor(Math.random() * 1000)}`;
     }
     return newId;
-  };
+  }, [elements]);
 
   const addElement = (type: ElementType, opts?: { parentId?: string; insertAfterId?: string; insertIndex?: number }) => {
     const defaultLabels: Record<string, { th: string; en: string }> = {
@@ -341,9 +341,9 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
     setSelectedId(newElement.id);
   };
 
-  const updateElement = (updated: FormElement) => {
-    setElements(elements.map(el => el.id === updated.id ? updated : el));
-  };
+  const updateElement = useCallback((updated: FormElement) => {
+    setElements(prev => prev.map(el => el.id === updated.id ? updated : el));
+  }, []);
 
   const requestLabelChange = (id: string, newLabel: string) => {
     const slugify = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
@@ -437,12 +437,14 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
     setSelectedId(newId);
   };
 
-  const moveElement = (dragIndex: number, hoverIndex: number) => {
-    const updatedElements = [...elements];
-    const [draggedElement] = updatedElements.splice(dragIndex, 1);
-    updatedElements.splice(hoverIndex, 0, draggedElement);
-    setElements(updatedElements);
-  };
+  const moveElement = useCallback((dragIndex: number, hoverIndex: number) => {
+    setElements(prev => {
+      const updated = [...prev];
+      const [dragged] = updated.splice(dragIndex, 1);
+      updated.splice(hoverIndex, 0, dragged);
+      return updated;
+    });
+  }, []);
 
   const reparentElement = (elementId: string, newParentId?: string) => {
     if (elementId === newParentId) return; // Cannot parent to self
@@ -624,16 +626,30 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
     if (csvInputRef.current) csvInputRef.current.value = '';
   };
 
-  const selectedElement = elements.find(el => el.id === selectedId);
-  const pageElements = elements.filter(el => el.pageId === currentPageId);
+  // Memoized computed values for better performance
+  const selectedElement = useMemo(
+    () => elements.find(el => el.id === selectedId),
+    [elements, selectedId]
+  );
+  
+  const pageElements = useMemo(
+    () => elements.filter(el => el.pageId === currentPageId),
+    [elements, currentPageId]
+  );
   
   // Filter elements by signer view (if selected)
-  const filteredPageElements = viewAsSignerId
-    ? pageElements.filter(el => !el.signerId || el.signerId === viewAsSignerId)
-    : pageElements;
+  const filteredPageElements = useMemo(
+    () => viewAsSignerId
+      ? pageElements.filter(el => !el.signerId || el.signerId === viewAsSignerId)
+      : pageElements,
+    [pageElements, viewAsSignerId]
+  );
   
   // Get current viewing signer info
-  const viewingSigner = viewAsSignerId ? signers.find(s => s.id === viewAsSignerId) : null;
+  const viewingSigner = useMemo(
+    () => viewAsSignerId ? signers.find(s => s.id === viewAsSignerId) : null,
+    [viewAsSignerId, signers]
+  );
 
   // Ensure selectable option-based elements always have an options array when selected
   React.useEffect(() => {
