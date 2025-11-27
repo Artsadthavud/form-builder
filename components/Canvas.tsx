@@ -51,9 +51,26 @@ const CanvasElementItem = memo<CanvasElementItemProps>(({
         e.stopPropagation();
         onSelect(el.id);
       }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSelect(el.id);
+        }
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+          e.preventDefault();
+          if (confirm(`Delete "${getCanvasTextLocal(el.label) || el.id}"?`)) {
+            onDelete(el.id);
+          }
+        }
+      }}
+      tabIndex={0}
+      role="button"
+      aria-label={`${el.type} element: ${getCanvasTextLocal(el.label) || el.id}. ${selectedId === el.id ? 'Selected.' : ''} Press Enter to select, Delete to remove.`}
+      aria-selected={selectedId === el.id}
+      aria-grabbed={draggedId === el.id}
       style={{ width: el.type === 'section' ? '100%' : `${el.width || 100}%` }}
       className={`
-        relative px-2 mb-4
+        relative px-2 mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 rounded-lg
         ${draggedId === el.id ? 'opacity-50' : 'opacity-100'}
       `}
     >
@@ -69,16 +86,17 @@ const CanvasElementItem = memo<CanvasElementItemProps>(({
         style={buildCustomStyles(el)}
       >
         {/* Action Buttons */}
-        <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-auto z-20">
+        <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity pointer-events-auto z-20" role="toolbar" aria-label="Element actions">
           <button
             onClick={(e) => {
               e.stopPropagation();
               onDuplicate(el.id);
             }}
-            className="p-1 bg-indigo-500 hover:bg-indigo-600 text-white rounded text-xs font-medium shadow-sm"
-            title="Duplicate"
+            className="p-1 bg-indigo-500 hover:bg-indigo-600 focus:bg-indigo-600 text-white rounded text-xs font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-1"
+            title="Duplicate element"
+            aria-label={`Duplicate ${getCanvasTextLocal(el.label) || el.id}`}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
             </svg>
           </button>
@@ -89,10 +107,11 @@ const CanvasElementItem = memo<CanvasElementItemProps>(({
                 onDelete(el.id);
               }
             }}
-            className="p-1 bg-red-500 hover:bg-red-600 text-white rounded text-xs font-medium shadow-sm"
-            title="Delete"
+            className="p-1 bg-red-500 hover:bg-red-600 focus:bg-red-600 text-white rounded text-xs font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-1"
+            title="Delete element"
+            aria-label={`Delete ${getCanvasTextLocal(el.label) || el.id}`}
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
             </svg>
           </button>

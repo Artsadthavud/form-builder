@@ -917,6 +917,120 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                </>
              )}
 
+             {/* File Upload Settings */}
+             {element.type === 'file' && (
+               <div className="space-y-3">
+                 {/* Allow Multiple */}
+                 <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                   <input
+                     type="checkbox"
+                     checked={element.allowMultiple || false}
+                     onChange={(e) => handleChange('allowMultiple', e.target.checked)}
+                     className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                   />
+                   {currentLanguage === 'th' ? 'อนุญาตหลายไฟล์' : 'Allow Multiple Files'}
+                 </label>
+
+                 {/* Max File Size */}
+                 <div>
+                   <label className="block text-xs font-medium text-slate-700 mb-1">
+                     {currentLanguage === 'th' ? 'ขนาดไฟล์สูงสุด (MB)' : 'Max File Size (MB)'}
+                   </label>
+                   <input
+                     type="number"
+                     min="1"
+                     max="100"
+                     value={element.maxFileSize || 10}
+                     onChange={(e) => handleChange('maxFileSize', parseInt(e.target.value) || 10)}
+                     className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm bg-white"
+                   />
+                 </div>
+
+                 {/* Accepted File Types */}
+                 <div>
+                   <label className="block text-xs font-medium text-slate-700 mb-2">
+                     {currentLanguage === 'th' ? 'ประเภทไฟล์ที่อนุญาต' : 'Allowed File Types'}
+                   </label>
+                   
+                   {/* Preset buttons */}
+                   <div className="flex flex-wrap gap-1 mb-2">
+                     <button
+                       type="button"
+                       onClick={() => handleChange('validation', { ...element.validation, acceptedFileTypes: ['image/*'] })}
+                       className={`px-2 py-1 text-[10px] rounded border transition-colors ${
+                         element.validation?.acceptedFileTypes?.includes('image/*')
+                           ? 'bg-indigo-100 border-indigo-300 text-indigo-700'
+                           : 'bg-slate-100 border-slate-200 hover:bg-slate-200'
+                       }`}
+                     >
+                       🖼️ {currentLanguage === 'th' ? 'รูปภาพ' : 'Images'}
+                     </button>
+                     <button
+                       type="button"
+                       onClick={() => handleChange('validation', { ...element.validation, acceptedFileTypes: ['.pdf'] })}
+                       className={`px-2 py-1 text-[10px] rounded border transition-colors ${
+                         element.validation?.acceptedFileTypes?.includes('.pdf')
+                           ? 'bg-indigo-100 border-indigo-300 text-indigo-700'
+                           : 'bg-slate-100 border-slate-200 hover:bg-slate-200'
+                       }`}
+                     >
+                       📕 PDF
+                     </button>
+                     <button
+                       type="button"
+                       onClick={() => handleChange('validation', { ...element.validation, acceptedFileTypes: ['.pdf', '.doc', '.docx', '.xls', '.xlsx'] })}
+                       className={`px-2 py-1 text-[10px] rounded border transition-colors ${
+                         element.validation?.acceptedFileTypes?.some(t => ['.doc', '.docx'].includes(t))
+                           ? 'bg-indigo-100 border-indigo-300 text-indigo-700'
+                           : 'bg-slate-100 border-slate-200 hover:bg-slate-200'
+                       }`}
+                     >
+                       📄 {currentLanguage === 'th' ? 'เอกสาร' : 'Documents'}
+                     </button>
+                     <button
+                       type="button"
+                       onClick={() => handleChange('validation', { ...element.validation, acceptedFileTypes: ['video/*'] })}
+                       className={`px-2 py-1 text-[10px] rounded border transition-colors ${
+                         element.validation?.acceptedFileTypes?.includes('video/*')
+                           ? 'bg-indigo-100 border-indigo-300 text-indigo-700'
+                           : 'bg-slate-100 border-slate-200 hover:bg-slate-200'
+                       }`}
+                     >
+                       🎬 {currentLanguage === 'th' ? 'วิดีโอ' : 'Videos'}
+                     </button>
+                     <button
+                       type="button"
+                       onClick={() => handleChange('validation', { ...element.validation, acceptedFileTypes: undefined })}
+                       className={`px-2 py-1 text-[10px] rounded border transition-colors ${
+                         !element.validation?.acceptedFileTypes
+                           ? 'bg-green-100 border-green-300 text-green-700'
+                           : 'bg-slate-100 border-slate-200 hover:bg-slate-200'
+                       }`}
+                     >
+                       ✨ {currentLanguage === 'th' ? 'ทุกประเภท' : 'All Types'}
+                     </button>
+                   </div>
+
+                   {/* Custom types input */}
+                   <input
+                     type="text"
+                     value={(element.validation?.acceptedFileTypes || []).join(', ')}
+                     onChange={(e) => {
+                       const types = e.target.value.split(',').map(t => t.trim()).filter(Boolean);
+                       handleChange('validation', { ...element.validation, acceptedFileTypes: types.length > 0 ? types : undefined });
+                     }}
+                     placeholder={currentLanguage === 'th' ? 'เช่น .pdf, .jpg, image/*' : 'e.g., .pdf, .jpg, image/*'}
+                     className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm font-mono text-xs bg-white"
+                   />
+                   <p className="text-[10px] text-slate-500 mt-1">
+                     {currentLanguage === 'th' 
+                       ? 'แยกด้วยเครื่องหมายจุลภาค เช่น .pdf, .jpg, image/*, video/*' 
+                       : 'Separate with commas, e.g., .pdf, .jpg, image/*, video/*'}
+                   </p>
+                 </div>
+               </div>
+             )}
+
              {/* Custom Validation Message */}
              <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1">Custom Error Message</label>
