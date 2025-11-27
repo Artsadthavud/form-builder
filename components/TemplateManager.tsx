@@ -27,7 +27,7 @@ const builtInBodyTemplates: FormTemplate[] = [
         placeholder: t('กรุณากรอกชื่อ-นามสกุล', 'Enter your full name'),
         required: true,
         width: '100',
-      },
+      } as FormElement,
       {
         id: 'tpl_email',
         type: 'email',
@@ -35,7 +35,7 @@ const builtInBodyTemplates: FormTemplate[] = [
         placeholder: t('example@email.com', 'example@email.com'),
         required: true,
         width: '50',
-      },
+      } as FormElement,
       {
         id: 'tpl_phone',
         type: 'phone',
@@ -43,7 +43,7 @@ const builtInBodyTemplates: FormTemplate[] = [
         placeholder: t('0xx-xxx-xxxx', '0xx-xxx-xxxx'),
         required: false,
         width: '50',
-      },
+      } as FormElement,
       {
         id: 'tpl_message',
         type: 'textarea',
@@ -51,7 +51,7 @@ const builtInBodyTemplates: FormTemplate[] = [
         placeholder: t('กรุณากรอกข้อความของคุณ', 'Enter your message'),
         required: true,
         width: '100',
-      },
+      } as FormElement,
     ],
   },
   {
@@ -833,17 +833,20 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
 
   // Handle applying body template
   const handleApplyBodyTemplate = (template: FormTemplate, mode: 'replace' | 'append') => {
-    if (!template.elements) return;
+    if (!template || !template.elements || template.elements.length === 0) {
+      console.error('Template has no elements:', template);
+      return;
+    }
     
     // Generate new unique IDs for elements
-    const newElements = template.elements.map(el => ({
+    const newElements: FormElement[] = template.elements.map(el => ({
       ...el,
       id: generateId(),
       options: el.options?.map(opt => ({
         ...opt,
         id: `opt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       })),
-    }));
+    })) as FormElement[];
     
     onApplyBody(newElements, mode);
     setShowApplyBodyConfirm(null);
@@ -1230,7 +1233,11 @@ const TemplateManager: React.FC<TemplateManagerProps> = ({
                 Cancel
               </button>
               <button
-                onClick={() => handleApplyBodyTemplate(showApplyBodyConfirm, applyBodyMode)}
+                onClick={() => {
+                  if (showApplyBodyConfirm) {
+                    handleApplyBodyTemplate(showApplyBodyConfirm, applyBodyMode);
+                  }
+                }}
                 className="px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors"
               >
                 Apply Template

@@ -1022,12 +1022,18 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
             setShowTemplateManager(false);
           }}
           onApplyBody={(newElements, mode) => {
+            // Ensure all elements have the current page ID
+            const elementsWithPageId = newElements.map(el => ({
+              ...el,
+              pageId: el.pageId || currentPageId,
+            }));
+            
             if (mode === 'replace') {
               // Replace all elements with template elements
-              setElements(newElements);
+              setElements(elementsWithPageId);
             } else {
               // Append template elements to existing elements
-              setElements([...elements, ...newElements]);
+              setElements([...elements, ...elementsWithPageId]);
             }
             setShowTemplateManager(false);
           }}
