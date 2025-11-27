@@ -258,3 +258,43 @@ export interface FormStatistics {
   completionRate: number;
   lastSubmission?: string;
 }
+
+// --- Templates ---
+export type TemplateCategory = 'header' | 'footer' | 'form' | 'element-group';
+
+export interface HeaderFooterStyle {
+  backgroundColor?: string;
+  textColor?: string;
+  textAlignment?: 'left' | 'center' | 'right';
+  logoUrl?: string;
+  logoPlacement?: 'top' | 'bottom' | 'left' | 'right';
+  logoAlignment?: 'left' | 'center' | 'right';
+  logoWidth?: number;
+}
+
+export interface FormTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  category: TemplateCategory;
+  isBuiltIn: boolean; // true = preset, false = user-created
+  createdAt: string;
+  updatedAt?: string;
+  thumbnail?: string; // preview image URL or data URL
+  
+  // For header templates
+  headerStyle?: HeaderFooterStyle & {
+    title?: string | TranslatableText;
+    description?: string | TranslatableText;
+  };
+  
+  // For footer templates
+  footerStyle?: HeaderFooterStyle & {
+    footerText?: string | TranslatableText;
+  };
+  
+  // For full form templates
+  metadata?: FormMetadata;
+  elements?: FormElement[];
+  pages?: FormPage[];
+}

@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { FormElement, ElementType, FormMetadata, FormProject, Language, FormPage, Calculation, SkipRule } from './types';
+import { FormElement, ElementType, FormMetadata, FormProject, Language, FormPage, Calculation, SkipRule, FormTemplate } from './types';
 import Toolbox from './components/Toolbox';
 import Canvas from './components/Canvas';
 import PropertiesPanel from './components/PropertiesPanel';
@@ -8,6 +8,7 @@ import Preview from './components/Preview';
 import FormSettingsModal from './components/FormSettingsModal';
 import CalculationBuilder from './components/CalculationBuilder';
 import SkipLogicBuilder from './components/SkipLogicBuilder';
+import TemplateManager from './components/TemplateManager';
 
 interface FormBuilderProps {
   form: FormProject;
@@ -35,6 +36,7 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
   const [showImportModal, setShowImportModal] = useState(false);
   const [showCalculationBuilder, setShowCalculationBuilder] = useState(false);
   const [showSkipLogicBuilder, setShowSkipLogicBuilder] = useState<string | null>(null); // page id
+  const [showTemplateManager, setShowTemplateManager] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const csvInputRef = useRef<HTMLInputElement>(null);
 
@@ -699,6 +701,19 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
           </button>
 
           <button
+            onClick={() => setShowTemplateManager(true)}
+            className="hidden md:flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded-md hover:bg-slate-50 hover:text-violet-600 transition-all shadow-sm"
+            title="Header/Footer Templates"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="3" y1="9" x2="21" y2="9"></line>
+              <line x1="3" y1="15" x2="21" y2="15"></line>
+            </svg>
+            <span>Templates</span>
+          </button>
+
+          <button
             onClick={exportSchema}
             className="hidden md:flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-600 bg-white border border-slate-300 rounded-md hover:bg-slate-50 hover:text-indigo-600 transition-all shadow-sm"
             title="Export Form Schema"
@@ -970,6 +985,44 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
             setShowSkipLogicBuilder(null);
           }}
           onClose={() => setShowSkipLogicBuilder(null)}
+        />
+      )}
+
+      {/* Template Manager Modal */}
+      {showTemplateManager && (
+        <TemplateManager
+          currentMetadata={formMeta}
+          currentLanguage={currentLanguage}
+          onApplyHeader={(headerStyle) => {
+            if (headerStyle) {
+              setFormMeta({
+                ...formMeta,
+                headerBackgroundColor: headerStyle.backgroundColor,
+                headerTitleColor: headerStyle.textColor,
+                headerTextAlignment: headerStyle.textAlignment,
+                logoUrl: headerStyle.logoUrl || formMeta.logoUrl,
+                logoPlacement: headerStyle.logoPlacement || formMeta.logoPlacement,
+                logoAlignment: headerStyle.logoAlignment || formMeta.logoAlignment,
+                logoWidth: headerStyle.logoWidth || formMeta.logoWidth,
+              });
+            }
+            setShowTemplateManager(false);
+          }}
+          onApplyFooter={(footerStyle) => {
+            if (footerStyle) {
+              setFormMeta({
+                ...formMeta,
+                footerBackgroundColor: footerStyle.backgroundColor,
+                footerTextColor: footerStyle.textColor,
+                footerText: footerStyle.footerText || formMeta.footerText,
+              });
+            }
+            setShowTemplateManager(false);
+          }}
+          onSaveAsTemplate={(name, category) => {
+            // Handled internally by TemplateManager
+          }}
+          onClose={() => setShowTemplateManager(false)}
         />
       )}
     </div>
