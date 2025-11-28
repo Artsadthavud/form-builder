@@ -135,29 +135,51 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
               </span>
             </div>
             <div className="space-y-2">
-              {(formMetadata.availableLanguages || ['th', 'en']).map((lang, idx) => (
-                <div key={lang} className="flex items-center gap-2 bg-white rounded-lg p-2 border-2 border-indigo-200 shadow-sm hover:border-purple-300 transition-all">
-                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 text-white text-xs font-bold shadow-sm">
-                    {idx + 1}
-                  </span>
-                  <span className="flex-1 font-semibold text-sm text-slate-700">
-                    {lang === 'th' ? '🇹🇭 Thai' : lang === 'en' ? '🇬🇧 English' : lang.toUpperCase()}
-                  </span>
-                  {(formMetadata.availableLanguages || ['th', 'en']).length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const newLangs = (formMetadata.availableLanguages || ['th', 'en']).filter(l => l !== lang);
-                        handleMetaChange('availableLanguages', newLangs);
-                        if (currentLanguage === lang) onLanguageChange(newLangs[0]);
-                      }}
-                      className="px-2 py-1 text-[10px] font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-md transition-all"
-                    >
-                      Remove
-                    </button>
-                  )}
-                </div>
-              ))}
+              {(formMetadata.availableLanguages || ['th', 'en']).map((lang, idx) => {
+                const isDefault = formMetadata.defaultLanguage === lang || (!formMetadata.defaultLanguage && lang === 'th');
+                return (
+                  <div key={lang} className={`flex items-center gap-2 bg-white rounded-lg p-2 border-2 shadow-sm transition-all ${
+                    isDefault ? 'border-amber-400 bg-amber-50' : 'border-indigo-200 hover:border-purple-300'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="defaultLanguage"
+                      checked={isDefault}
+                      onChange={() => handleMetaChange('defaultLanguage', lang)}
+                      className="w-4 h-4 text-amber-500 focus:ring-amber-500 cursor-pointer"
+                      title="Set as default language"
+                    />
+                    <span className="flex items-center justify-center w-6 h-6 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 text-white text-xs font-bold shadow-sm">
+                      {idx + 1}
+                    </span>
+                    <span className="flex-1 font-semibold text-sm text-slate-700">
+                      {lang === 'th' ? 'TH Thai' : lang === 'en' ? 'GB English' : lang.toUpperCase()}
+                    </span>
+                    {isDefault && (
+                      <span className="text-[10px] font-semibold text-amber-600 bg-amber-100 px-2 py-0.5 rounded">
+                        Default
+                      </span>
+                    )}
+                    {(formMetadata.availableLanguages || ['th', 'en']).length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newLangs = (formMetadata.availableLanguages || ['th', 'en']).filter(l => l !== lang);
+                          handleMetaChange('availableLanguages', newLangs);
+                          if (currentLanguage === lang) onLanguageChange(newLangs[0]);
+                          // If removing default language, set new default
+                          if (isDefault && newLangs.length > 0) {
+                            handleMetaChange('defaultLanguage', newLangs[0]);
+                          }
+                        }}
+                        className="px-2 py-1 text-[10px] font-semibold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-md transition-all"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
             {/* Inline Add Language Form */}
@@ -253,6 +275,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                 Add Language
               </button>
             )}
+
           </div>
 
           {/* General Header Settings */}
