@@ -1,15 +1,27 @@
-import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
 import { FormElement, ElementType, FormMetadata, FormProject, Language, FormPage, Signer, SignerMode } from './types';
 import Toolbox from './components/Toolbox';
 import Canvas from './components/Canvas';
 import PropertiesPanel from './components/PropertiesPanel';
-import Preview from './components/Preview';
-import FormSettingsModal from './components/FormSettingsModal';
-import CalculationBuilder from './components/CalculationBuilder';
-import SkipLogicBuilder from './components/SkipLogicBuilder';
-import TemplateManager from './components/TemplateManager';
 import { useFormBuilderState } from './hooks/useFormBuilderState';
 import { useAutosave, useAutoSaveToParent } from './hooks/useAutosave';
+
+// Lazy load heavy components for code splitting
+const Preview = lazy(() => import('./components/Preview'));
+const FormSettingsModal = lazy(() => import('./components/FormSettingsModal'));
+const CalculationBuilder = lazy(() => import('./components/CalculationBuilder'));
+const SkipLogicBuilder = lazy(() => import('./components/SkipLogicBuilder'));
+const TemplateManager = lazy(() => import('./components/TemplateManager'));
+
+// Loading fallback component
+const LoadingFallback = () => (
+  <div className="fixed inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-50">
+    <div className="flex flex-col items-center gap-3">
+      <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+      <span className="text-slate-600 text-sm">Loading...</span>
+    </div>
+  </div>
+);
 
 interface FormBuilderProps {
   form: FormProject;
@@ -749,17 +761,18 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
         />
       </div>
 
-      {/* Modals */}
-      {isPreview && (
-        <Preview
-          elements={elements}
-          pages={pages}
-          meta={formMeta}
-          currentLanguage={currentLanguage}
-          onLanguageChange={setCurrentLanguage}
-          onClose={() => setIsPreview(false)}
-        />
-      )}
+      {/* Modals - Wrapped in Suspense for code splitting */}
+      <Suspense fallback={<LoadingFallback />}>
+        {isPreview && (
+          <Preview
+            elements={elements}
+            pages={pages}
+            meta={formMeta}
+            currentLanguage={currentLanguage}
+            onLanguageChange={setCurrentLanguage}
+            onClose={() => setIsPreview(false)}
+          />
+        )}
 
       {showCodeModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -976,6 +989,7 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
           onClose={() => setShowTemplateManager(false)}
         />
       )}
+      </Suspense>
     </div>
   );
 };

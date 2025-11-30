@@ -1,6 +1,13 @@
 
 export type ElementType = 'text' | 'email' | 'phone' | 'number' | 'textarea' | 'radio' | 'checkbox' | 'select' | 'section' | 'signature' | 'image' | 'date' | 'time' | 'file' | 'rating' | 'paragraph' | 'phone_otp' | 'email_otp';
 
+// Element type categories for type-safe operations
+export type TextInputType = 'text' | 'email' | 'phone' | 'number' | 'textarea' | 'date' | 'time';
+export type ChoiceType = 'radio' | 'checkbox' | 'select';
+export type OTPType = 'phone_otp' | 'email_otp';
+export type LayoutType = 'section' | 'paragraph' | 'image';
+export type SpecialType = 'signature' | 'file' | 'rating';
+
 export type Language = 'th' | 'en';
 
 export interface TranslatableText {
@@ -201,6 +208,53 @@ export interface FormElement {
   signerId?: string;              // ID ของ signer ที่เป็นเจ้าของ element นี้
   signerRequired?: boolean;       // signer คนนี้ต้องกรอก element นี้
 }
+
+// ========================================
+// Type Guards for Element Type Categories
+// ========================================
+
+/** Check if element is a text input type */
+export const isTextInputElement = (el: FormElement): el is FormElement & { type: TextInputType } =>
+  ['text', 'email', 'phone', 'number', 'textarea', 'date', 'time'].includes(el.type);
+
+/** Check if element is a choice/selection type */
+export const isChoiceElement = (el: FormElement): el is FormElement & { type: ChoiceType } =>
+  ['radio', 'checkbox', 'select'].includes(el.type);
+
+/** Check if element is an OTP verification type */
+export const isOTPElement = (el: FormElement): el is FormElement & { type: OTPType } =>
+  ['phone_otp', 'email_otp'].includes(el.type);
+
+/** Check if element is a layout/display type */
+export const isLayoutElement = (el: FormElement): el is FormElement & { type: LayoutType } =>
+  ['section', 'paragraph', 'image'].includes(el.type);
+
+/** Check if element requires options array */
+export const requiresOptions = (type: ElementType): boolean =>
+  ['radio', 'checkbox', 'select'].includes(type);
+
+/** Check if element supports validation */
+export const supportsValidation = (type: ElementType): boolean =>
+  ['text', 'email', 'phone', 'number', 'textarea', 'file'].includes(type);
+
+/** Check if element supports calculation */
+export const supportsCalculation = (type: ElementType): boolean =>
+  type === 'number';
+
+/** Get default width for element type */
+export const getDefaultWidth = (type: ElementType): string => {
+  switch (type) {
+    case 'section':
+    case 'paragraph':
+    case 'image':
+      return '100';
+    case 'checkbox':
+    case 'radio':
+      return '100';
+    default:
+      return '100';
+  }
+};
 
 // OTP Verification Configuration
 export interface OTPConfig {

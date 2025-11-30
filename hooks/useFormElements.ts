@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, Dispatch, SetStateAction } from 'react';
 import { FormElement, ElementType, Language, TranslatableText } from '../types';
 
 interface UseFormElementsOptions {
@@ -9,7 +9,7 @@ interface UseFormElementsOptions {
 
 interface UseFormElementsReturn {
   elements: FormElement[];
-  setElements: React.Dispatch<React.SetStateAction<FormElement[]>>;
+  setElements: Dispatch<SetStateAction<FormElement[]>>;
   pageElements: FormElement[];
   selectedElement: FormElement | undefined;
   selectedId: string | null;
