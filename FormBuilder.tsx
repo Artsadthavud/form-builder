@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect, useMemo, useCallback, lazy, Suspens
 import { FormElement, ElementType, FormMetadata, FormProject, Language, FormPage, Signer, SignerMode } from './types';
 import Toolbox from './components/Toolbox';
 import Canvas from './components/Canvas';
-import PropertiesPanel from './components/PropertiesPanel';
 import { useFormBuilderState } from './hooks/useFormBuilderState';
 import { useAutosave, useAutoSaveToParent } from './hooks/useAutosave';
 
@@ -12,6 +11,7 @@ const FormSettingsModal = lazy(() => import('./components/FormSettingsModal'));
 const CalculationBuilder = lazy(() => import('./components/CalculationBuilder'));
 const SkipLogicBuilder = lazy(() => import('./components/SkipLogicBuilder'));
 const TemplateManager = lazy(() => import('./components/TemplateManager'));
+const PropertiesPanel = lazy(() => import('./components/PropertiesPanel'));
 
 // Loading fallback component
 const LoadingFallback = () => (
@@ -746,20 +746,31 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
           </div>
         </div>
 
-        {/* Right Sidebar: Properties */}
-        <PropertiesPanel
-          element={selectedElement}
-          allElements={elements}
-          formMetadata={formMeta}
-          currentLanguage={currentLanguage}
-          signers={signers}
-          onLanguageChange={setCurrentLanguage}
-          onUpdate={updateElement}
-          onDelete={deleteElement}
-          onUpdateMetadata={setFormMeta}
-          onRequestLabelChange={requestLabelChange}
-          onOpenCalculation={() => setShowCalculationBuilder(true)}
-        />
+        {/* Right Sidebar: Properties - Lazy loaded */}
+        <Suspense fallback={
+          <div className="w-80 bg-white border-l border-slate-200 flex flex-col h-full shadow-lg z-10">
+            <div className="flex-1 flex items-center justify-center">
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-8 h-8 border-3 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+                <span className="text-slate-500 text-sm">Loading panel...</span>
+              </div>
+            </div>
+          </div>
+        }>
+          <PropertiesPanel
+            element={selectedElement}
+            allElements={elements}
+            formMetadata={formMeta}
+            currentLanguage={currentLanguage}
+            signers={signers}
+            onLanguageChange={setCurrentLanguage}
+            onUpdate={updateElement}
+            onDelete={deleteElement}
+            onUpdateMetadata={setFormMeta}
+            onRequestLabelChange={requestLabelChange}
+            onOpenCalculation={() => setShowCalculationBuilder(true)}
+          />
+        </Suspense>
       </div>
 
       {/* Modals - Wrapped in Suspense for code splitting */}
