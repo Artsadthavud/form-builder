@@ -159,9 +159,9 @@ const ResponseManager: React.FC<ResponseManagerProps> = ({
                     >
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-xs font-mono text-slate-500">#{response.id.slice(0, 8)}</span>
-                        {response.language && (
+                        {response.metadata?.language && (
                           <span className="text-xs px-2 py-0.5 bg-slate-100 text-slate-600 rounded">
-                            {response.language === 'th' ? '🇹🇭' : '🇬🇧'}
+                            {response.metadata.language === 'th' ? '🇹🇭' : '🇬🇧'}
                           </span>
                         )}
                       </div>
@@ -199,17 +199,17 @@ const ResponseManager: React.FC<ResponseManagerProps> = ({
                       <div className="text-xs text-slate-500">เวลาที่ใช้</div>
                       <div className="text-sm font-medium text-slate-900">{formatTime(selectedResponse.completionTime)}</div>
                     </div>
-                    {selectedResponse.ipAddress && (
+                    {selectedResponse.metadata?.ipAddress && (
                       <div>
                         <div className="text-xs text-slate-500">IP Address</div>
-                        <div className="text-sm font-medium text-slate-900 font-mono">{selectedResponse.ipAddress}</div>
+                        <div className="text-sm font-medium text-slate-900 font-mono">{selectedResponse.metadata.ipAddress}</div>
                       </div>
                     )}
-                    {selectedResponse.language && (
+                    {selectedResponse.metadata?.language && (
                       <div>
                         <div className="text-xs text-slate-500">ภาษา</div>
                         <div className="text-sm font-medium text-slate-900">
-                          {selectedResponse.language === 'th' ? 'ภาษาไทย' : 'English'}
+                          {selectedResponse.metadata.language === 'th' ? 'ภาษาไทย' : 'English'}
                         </div>
                       </div>
                     )}
@@ -221,7 +221,7 @@ const ResponseManager: React.FC<ResponseManagerProps> = ({
                     {Object.entries(selectedResponse.data).map(([fieldId, value]) => (
                       <div key={fieldId} className="border-b border-slate-100 pb-4">
                         <div className="text-sm font-medium text-slate-700 mb-2">
-                          {getFieldLabel(fieldId, selectedResponse.language)}
+                          {getFieldLabel(fieldId, selectedResponse.metadata?.language)}
                         </div>
                         <div className="text-sm text-slate-900">
                           {renderValue(value)}

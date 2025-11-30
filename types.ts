@@ -8,11 +8,15 @@ export type OTPType = 'phone_otp' | 'email_otp';
 export type LayoutType = 'section' | 'paragraph' | 'image';
 export type SpecialType = 'signature' | 'file' | 'rating';
 
-export type Language = 'th' | 'en';
+// Built-in languages that have full translation support
+export type BuiltInLanguage = 'th' | 'en';
+// Extended language type allows custom languages to be added dynamically
+export type Language = BuiltInLanguage | (string & {});
 
 export interface TranslatableText {
   th: string;
   en: string;
+  [key: string]: string; // Allow dynamic language keys
 }
 
 export interface Option {

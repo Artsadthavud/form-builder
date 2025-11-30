@@ -335,7 +335,8 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `${formMeta.title?.replace(/[^a-z0-9]/gi,'_') || 'form-schema'}.json`;
+    const titleStr = typeof formMeta.title === 'string' ? formMeta.title : (formMeta.title?.[currentLanguage] || formMeta.title?.en || 'form-schema');
+    link.download = `${titleStr.replace(/[^a-z0-9]/gi,'_') || 'form-schema'}.json`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -692,7 +693,7 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
               >
                 <option value="">-- All Fields --</option>
                 {signers.map(s => (
-                  <option key={s.id} value={s.id}>{s.name} ({s.role})</option>
+                  <option key={s.id} value={s.id}>{s.order}. {s.name}</option>
                 ))}
               </select>
             </div>
@@ -912,6 +913,7 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
         <CalculationBuilder
           element={selectedElement}
           allElements={elements}
+          currentLanguage={currentLanguage}
           onSave={(calc) => {
             updateElement({ ...selectedElement, calculation: calc });
             setShowCalculationBuilder(false);
@@ -922,11 +924,13 @@ const FormBuilder: React.FC<FormBuilderProps> = ({ form, onSave, onSaveSettings,
 
       {showSkipLogicBuilder && (
         <SkipLogicBuilder
-          pageId={showSkipLogicBuilder}
-          pages={pages}
-          elements={elements}
-          onSave={(updatedPages) => {
-            setPages(updatedPages);
+          page={pages.find(p => p.id === showSkipLogicBuilder) || pages[0]}
+          allPages={pages}
+          allElements={elements}
+          currentLanguage={currentLanguage}
+          onSave={(skipRules) => {
+            const pageId = showSkipLogicBuilder;
+            setPages(prev => prev.map(p => p.id === pageId ? { ...p, skipRules } : p));
             setShowSkipLogicBuilder(null);
           }}
           onClose={() => setShowSkipLogicBuilder(null)}

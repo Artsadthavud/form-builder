@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FormProject, FormResponse, FormStatus } from './types';
+import { FormProject, FormResponse, FormStatus, SignerMode, Signer } from './types';
 import FormList from './components/FormList';
 import ResponseManager from './components/ResponseManager';
 import FormBuilder from './FormBuilder';
@@ -189,8 +189,8 @@ const AppContainer: React.FC = () => {
     metadata: any; 
     elements: any[]; 
     pages: any[];
-    signers?: any[];
-    signerMode?: string;
+    signers?: Signer[];
+    signerMode?: SignerMode;
   }) => {
     setForms(forms.map(f => 
       f.id === formId 
@@ -214,8 +214,8 @@ const AppContainer: React.FC = () => {
     site?: string;
     description?: string;
     tags?: string[];
-    signers?: any[];
-    signerMode?: string;
+    signers?: Signer[];
+    signerMode?: SignerMode;
   }) => {
     setForms(forms.map(f => 
       f.id === formId 

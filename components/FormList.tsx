@@ -373,7 +373,7 @@ const FormList: React.FC<FormListProps> = ({
                         </button>
                         <div className="relative">
                           <button 
-                            ref={(el) => buttonRefs.current[form.id] = el}
+                            ref={(el) => { buttonRefs.current[form.id] = el; }}
                             onClick={(e) => {
                               e.stopPropagation();
                               const rect = e.currentTarget.getBoundingClientRect();

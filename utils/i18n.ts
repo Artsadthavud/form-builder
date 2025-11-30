@@ -26,6 +26,28 @@ export function makeTranslatable(text: string): TranslatableText {
   return { th: text, en: text };
 }
 
+/**
+ * Format language code to display label
+ * Handles known languages and falls back to uppercase for unknown
+ */
+export function formatLanguageLabel(lang: Language | string, style: 'short' | 'long' | 'flag' = 'long'): string {
+  const langStr = String(lang);
+  const labels: Record<string, { short: string; long: string; flag: string }> = {
+    th: { short: 'TH', long: 'Thai', flag: '🇹🇭 ไทย (Thai)' },
+    en: { short: 'EN', long: 'English', flag: '🇬🇧 EN (English)' },
+    zh: { short: 'ZH', long: 'Chinese', flag: '🇨🇳 中文 (Chinese)' },
+    ja: { short: 'JA', long: 'Japanese', flag: '🇯🇵 日本語 (Japanese)' },
+    ko: { short: 'KO', long: 'Korean', flag: '🇰🇷 한국어 (Korean)' },
+  };
+  
+  if (labels[langStr]) {
+    return labels[langStr][style];
+  }
+  
+  // Fallback for unknown languages
+  return langStr.toUpperCase();
+}
+
 // Check translation completeness for a specific language
 export function isTranslationComplete(text: string | TranslatableText | undefined, language: Language): boolean {
   if (!text) return false;
