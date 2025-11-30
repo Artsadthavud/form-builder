@@ -6,6 +6,7 @@ import FormBuilder from './FormBuilder';
 import PublicForm from './components/PublicForm';
 import RevisionHistory from './components/RevisionHistory';
 import FormSettingsModal from './components/FormSettingsModal';
+import ErrorBoundary from './components/ErrorBoundary';
 
 type View = 'list' | 'builder' | 'responses' | 'submit' | 'revisions';
 
@@ -482,4 +483,11 @@ const AppContainer: React.FC = () => {
   );
 };
 
-export default AppContainer;
+// Wrap AppContainer with ErrorBoundary
+const AppContainerWithErrorBoundary: React.FC = () => (
+  <ErrorBoundary>
+    <AppContainer />
+  </ErrorBoundary>
+);
+
+export default AppContainerWithErrorBoundary;
